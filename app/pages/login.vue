@@ -15,6 +15,7 @@
           required
           :disabled="loading"
         />
+        <p v-if="errorMsg" class="text-sm text-red-500">{{ errorMsg }}</p>
         <UButton type="submit" block :loading="loading">
           Send Magic Link
         </UButton>
@@ -29,14 +30,20 @@ const supabase = useSupabaseClient()
 const email = ref('')
 const loading = ref(false)
 const sent = ref(false)
+const errorMsg = ref('')
 
 async function sendMagicLink() {
   loading.value = true
+  errorMsg.value = ''
   const { error } = await supabase.auth.signInWithOtp({
     email: email.value,
     options: { emailRedirectTo: `${window.location.origin}/confirm` },
   })
   loading.value = false
-  if (!error) sent.value = true
+  if (error) {
+    errorMsg.value = 'Diese E-Mail-Adresse ist nicht zugelassen.'
+  } else {
+    sent.value = true
+  }
 }
 </script>
