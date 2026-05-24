@@ -1,0 +1,1 @@
+export { useSupabaseClient } from '#imports'
