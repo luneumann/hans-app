@@ -1,0 +1,154 @@
+/**
+ * Sparrow Sensor Firmware
+ * ESP8266 + BME280 → Supabase sensor_readings via HTTPS POST
+ *
+ * Board: ESP8266 (e.g. Wemos D1 Mini)
+ * Libraries: ESP8266WiFi, ESP8266HTTPClient, WiFiClientSecure,
+ *            ArduinoJson, Adafruit_BME280, Adafruit_Sensor
+ */
+
+#include <ESP8266WiFi.h>
+#include <ESP8266HTTPClient.h>
+#include <WiFiClientSecure.h>
+#include <ArduinoJson.h>
+#include <Wire.h>
+#include <Adafruit_BME280.h>
+#include <Adafruit_Sensor.h>
+
+// ─── Configuration ────────────────────────────────────────────────────────────
+
+#define WIFI_SSID        "YOUR_WIFI_SSID"
+#define WIFI_PASSWORD    "YOUR_WIFI_PASSWORD"
+
+// Supabase project URL and anon key
+#define SUPABASE_URL     "https://navmfjgeoykmynriwpbz.supabase.co"
+#define SUPABASE_ANON_KEY "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5hdm1mamdlb3lrbXlucml3cGJ6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk2NjAyNDgsImV4cCI6MjA5NTIzNjI0OH0.ntJHHqSNJjFVHSCPEUyhwx6xVIURBgwjuE2tsxRZ7vg"
+
+// Unique ID for this sensor device (must exist in devices table)
+#define SPARROW_ID       "YOUR_SPARROW_DEVICE_ID"
+
+// Deep sleep duration in microseconds (5 minutes)
+#define SLEEP_INTERVAL_US (5UL * 60UL * 1000000UL)
+
+// WiFi connect timeout in milliseconds
+#define WIFI_TIMEOUT_MS  20000
+
+// ─── Globals ──────────────────────────────────────────────────────────────────
+
+Adafruit_BME280 bme;
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+bool connectWiFi() {
+  WiFi.mode(WIFI_STA);
+  WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
+
+  unsigned long start = millis();
+  while (WiFi.status() != WL_CONNECTED) {
+    if (millis() - start > WIFI_TIMEOUT_MS) return false;
+    delay(200);
+  }
+  return true;
+}
+
+/**
+ * POST a single metric to Supabase sensor_readings.
+ * Returns HTTP status code, or -1 on connection failure.
+ */
+int postReading(WiFiClientSecure& client, const char* metric, float value) {
+  HTTPClient http;
+  String url = String(SUPABASE_URL) + "/rest/v1/sensor_readings";
+
+  http.begin(client, url);
+  http.addHeader("Content-Type", "application/json");
+  http.addHeader("apikey", SUPABASE_ANON_KEY);
+  http.addHeader("Authorization", "Bearer " + String(SUPABASE_ANON_KEY));
+  // Prefer=return=minimal avoids fetching the inserted row (saves bandwidth)
+  http.addHeader("Prefer", "return=minimal");
+
+  StaticJsonDocument<128> doc;
+  doc["sparrow_id"] = SPARROW_ID;
+  doc["metric"]     = metric;
+  doc["value"]      = value;
+  // recorded_at intentionally omitted — Supabase default now() is used
+
+  String body;
+  serializeJson(doc, body);
+
+  int status = http.POST(body);
+  http.end();
+  return status;
+}
+
+// ─── Setup (runs once per wake cycle) ────────────────────────────────────────
+
+void setup() {
+  Serial.begin(115200);
+  delay(100);
+
+  // ── BME280 init ──────────────────────────────────────────────────────────
+  Wire.begin();
+  if (!bme.begin(0x76)) {
+    // Try alternate address
+    if (!bme.begin(0x77)) {
+      Serial.println("[BME280] Not found — sleeping");
+      ESP.deepSleep(SLEEP_INTERVAL_US);
+      return;
+    }
+  }
+
+  // Forced mode: single measurement, then sensor sleeps automatically
+  bme.setSampling(
+    Adafruit_BME280::MODE_FORCED,
+    Adafruit_BME280::SAMPLING_X1,  // temperature
+    Adafruit_BME280::SAMPLING_X1,  // pressure
+    Adafruit_BME280::SAMPLING_X1,  // humidity
+    Adafruit_BME280::FILTER_OFF
+  );
+
+  // Wait for the forced measurement to complete (~10 ms)
+  while (bme.isMeasuring()) delay(10);
+
+  float temperature = bme.readTemperature();    // °C
+  float humidity    = bme.readHumidity();       // %RH
+  float pressure    = bme.readPressure() / 100.0f; // hPa
+
+  Serial.printf("[BME280] temp=%.2f°C  hum=%.2f%%  pres=%.2fhPa\n",
+                temperature, humidity, pressure);
+
+  // ── WiFi ─────────────────────────────────────────────────────────────────
+  if (!connectWiFi()) {
+    Serial.println("[WiFi] Connect timeout — sleeping");
+    ESP.deepSleep(SLEEP_INTERVAL_US);
+    return;
+  }
+  Serial.printf("[WiFi] Connected, IP: %s\n", WiFi.localIP().toString().c_str());
+
+  // ── HTTPS client (no cert verification — anon key only, no user data) ────
+  WiFiClientSecure client;
+  client.setInsecure(); // acceptable: anon key + RLS INSERT-only
+
+  // ── POST each metric ─────────────────────────────────────────────────────
+  struct { const char* name; float val; } metrics[] = {
+    { "temperature", temperature },
+    { "humidity",    humidity    },
+    { "pressure",    pressure    },
+  };
+
+  for (auto& m : metrics) {
+    int status = postReading(client, m.name, m.val);
+    Serial.printf("[POST] %s → HTTP %d\n", m.name, status);
+    // Brief pause between requests to avoid hammering the API
+    delay(100);
+  }
+
+  WiFi.disconnect(true);
+
+  // ── Deep sleep until next cycle ──────────────────────────────────────────
+  Serial.printf("[Sleep] %lu s\n", SLEEP_INTERVAL_US / 1000000UL);
+  ESP.deepSleep(SLEEP_INTERVAL_US);
+}
+
+void loop() {
+  // Never reached — deep sleep resets the chip
+}
