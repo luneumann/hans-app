@@ -1,2 +1,399 @@
 @import "tailwindcss";
 @import "@nuxt/ui";
+
+/* ================================================================
+   HANS — Home Ambient Network System
+   Lofi solarpunk dark design system
+   ================================================================ */
+
+:root {
+  --bg:        oklch(0.155 0.018 200);
+  --bg-soft:   oklch(0.195 0.02 200);
+  --panel:     oklch(0.215 0.022 195);
+  --panel-2:   oklch(0.245 0.025 195);
+  --line:      oklch(0.32 0.022 200);
+  --line-soft: oklch(0.27 0.02 200);
+
+  --ink:   oklch(0.94 0.012 90);
+  --ink-2: oklch(0.78 0.015 95);
+  --ink-3: oklch(0.6 0.018 100);
+  --ink-4: oklch(0.45 0.02 105);
+
+  --leaf:      oklch(0.74 0.13 130);
+  --leaf-soft: oklch(0.74 0.13 130 / 0.18);
+  --amber:     oklch(0.79 0.12 80);
+  --amber-soft:oklch(0.79 0.12 80 / 0.18);
+  --sky:       oklch(0.72 0.08 215);
+  --sky-soft:  oklch(0.72 0.08 215 / 0.18);
+  --clay:      oklch(0.66 0.13 40);
+  --clay-soft: oklch(0.66 0.13 40 / 0.18);
+  --plum:      oklch(0.68 0.1 320);
+  --plum-soft: oklch(0.68 0.1 320 / 0.18);
+
+  --shadow-soft: 0 1px 0 oklch(1 0 0 / 0.03) inset, 0 1px 2px oklch(0 0 0 / 0.3);
+  --shadow-card: 0 1px 0 oklch(1 0 0 / 0.04) inset, 0 6px 24px oklch(0 0 0 / 0.35);
+
+  --r-xs: 6px;
+  --r-sm: 10px;
+  --r-md: 14px;
+  --r-lg: 20px;
+  --r-xl: 28px;
+}
+
+/* Base */
+html, body { margin: 0; padding: 0; }
+body {
+  font-family: 'Geist', -apple-system, BlinkMacSystemFont, sans-serif;
+  background: var(--bg);
+  color: var(--ink);
+  font-size: 14px;
+  line-height: 1.45;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+.hans-mono { font-family: 'Geist Mono', ui-monospace, monospace; font-feature-settings: 'tnum' 1; }
+
+/* Film grain overlay */
+body::before {
+  content: '';
+  position: fixed; inset: 0;
+  pointer-events: none;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='180' height='180'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 0.06 0'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>");
+  opacity: 0.5;
+  mix-blend-mode: overlay;
+  z-index: 9999;
+}
+
+/* ── Navbar ── */
+.hans-nav {
+  position: sticky; top: 0; z-index: 50;
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 14px 32px;
+  background: color-mix(in oklab, var(--bg) 78%, transparent);
+  backdrop-filter: blur(14px) saturate(140%);
+  -webkit-backdrop-filter: blur(14px) saturate(140%);
+  border-bottom: 1px solid var(--line-soft);
+}
+.hans-nav-brand { display: flex; align-items: center; gap: 10px; font-weight: 600; letter-spacing: 0.02em; text-decoration: none; color: var(--ink); }
+.hans-nav-brand .logo {
+  width: 28px; height: 28px;
+  display: grid; place-items: center;
+  border-radius: 8px;
+  background: linear-gradient(135deg, var(--leaf-soft), var(--amber-soft));
+  border: 1px solid color-mix(in oklab, var(--leaf) 30%, transparent);
+}
+.hans-nav-brand .logo svg { width: 18px; height: 18px; }
+.hans-nav-brand .brand-title { font-size: 14px; }
+.hans-nav-brand .brand-sub { color: var(--ink-3); font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; }
+.hans-nav-links { display: flex; align-items: center; gap: 4px; }
+.hans-nav-link {
+  padding: 8px 14px;
+  border-radius: 999px;
+  color: var(--ink-2);
+  font-size: 13px;
+  text-decoration: none;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+  border: 1px solid transparent;
+}
+.hans-nav-link:hover { color: var(--ink); background: color-mix(in oklab, var(--ink) 6%, transparent); }
+.hans-nav-link.active { color: var(--ink); background: color-mix(in oklab, var(--leaf) 12%, transparent); border-color: color-mix(in oklab, var(--leaf) 22%, transparent); }
+.hans-nav-right { display: flex; align-items: center; gap: 14px; }
+.hans-nav-status { display: inline-flex; align-items: center; gap: 8px; font-size: 12px; color: var(--ink-3); }
+.hans-nav-status .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--leaf); box-shadow: 0 0 8px var(--leaf); animation: hans-pulse 2s ease-in-out infinite; }
+
+@keyframes hans-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.45; } }
+
+/* ── Page shell ── */
+.hans-page {
+  max-width: 1320px;
+  margin: 0 auto;
+  padding: 28px 32px 96px;
+}
+
+/* ── Hero ── */
+.hans-hero {
+  position: relative;
+  border-radius: var(--r-xl);
+  overflow: hidden;
+  border: 1px solid var(--line-soft);
+  margin-bottom: 28px;
+  background: var(--panel);
+  box-shadow: var(--shadow-card);
+}
+.hans-hero-img {
+  position: absolute; inset: 0;
+  background-size: cover;
+  background-position: center;
+  filter: saturate(0.95) brightness(0.85);
+}
+.hans-hero-img::after {
+  content: '';
+  position: absolute; inset: 0;
+  background:
+    linear-gradient(180deg, transparent 30%, color-mix(in oklab, var(--bg) 92%, transparent) 100%),
+    linear-gradient(90deg, color-mix(in oklab, var(--bg) 78%, transparent) 0%, color-mix(in oklab, var(--bg) 30%, transparent) 55%, transparent 100%);
+}
+.hans-hero-content {
+  position: relative;
+  padding: 36px 36px 32px;
+  display: grid;
+  grid-template-columns: 1.4fr 1fr;
+  gap: 24px;
+  min-height: 260px;
+}
+.hans-hero-greeting { font-size: 13px; color: var(--ink-3); letter-spacing: 0.16em; text-transform: uppercase; }
+.hans-hero-title { font-size: 34px; font-weight: 500; letter-spacing: -0.02em; margin: 10px 0 6px; }
+.hans-hero-title em { font-style: normal; color: var(--amber); }
+.hans-hero-sub { color: var(--ink-2); font-size: 15px; max-width: 56ch; }
+.hans-hero-tags { display: flex; gap: 8px; margin-top: 18px; flex-wrap: wrap; }
+.hans-hero-meta { display: flex; flex-direction: column; gap: 14px; align-items: flex-end; justify-content: flex-end; }
+
+/* ── Chip / Pill ── */
+.hans-chip {
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: color-mix(in oklab, var(--bg-soft) 80%, transparent);
+  border: 1px solid var(--line-soft);
+  font-size: 12px;
+  color: var(--ink-2);
+  backdrop-filter: blur(6px);
+}
+.hans-chip .dot { width: 6px; height: 6px; border-radius: 50%; }
+.hans-pill {
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 8px 14px;
+  border-radius: 999px;
+  background: color-mix(in oklab, var(--bg-soft) 60%, transparent);
+  border: 1px solid var(--line-soft);
+  font-size: 13px;
+  color: var(--ink-2);
+}
+
+/* ── Section heading ── */
+.hans-section-head {
+  display: flex; align-items: flex-end; justify-content: space-between;
+  margin: 36px 4px 16px;
+  gap: 16px;
+}
+.hans-section-head h2 { font-size: 13px; font-weight: 500; letter-spacing: 0.16em; text-transform: uppercase; color: var(--ink-3); margin: 0; }
+.hans-section-head .meta { font-size: 12px; color: var(--ink-4); font-family: 'Geist Mono', monospace; }
+
+/* ── Card ── */
+.hans-card {
+  background: linear-gradient(180deg, color-mix(in oklab, var(--panel) 100%, transparent), color-mix(in oklab, var(--panel) 92%, transparent));
+  border: 1px solid var(--line-soft);
+  border-radius: var(--r-lg);
+  padding: 20px;
+  box-shadow: var(--shadow-card);
+}
+
+/* ── Metric cards ── */
+.hans-metrics-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
+.hans-metric {
+  position: relative;
+  padding: 20px;
+  border-radius: var(--r-lg);
+  border: 1px solid var(--line-soft);
+  background: var(--panel);
+  overflow: hidden;
+  box-shadow: var(--shadow-card);
+}
+.hans-metric::before {
+  content: '';
+  position: absolute; top: 0; left: 0; right: 0; height: 2px;
+  background: linear-gradient(90deg, transparent, var(--accent, var(--leaf)) 50%, transparent);
+  opacity: 0.7;
+}
+.hans-metric-head { display: flex; align-items: center; justify-content: space-between; }
+.hans-metric-name { display: flex; align-items: center; gap: 10px; font-size: 12px; color: var(--ink-3); letter-spacing: 0.1em; text-transform: uppercase; }
+.hans-metric-icon {
+  width: 26px; height: 26px;
+  display: grid; place-items: center;
+  border-radius: 8px;
+  background: color-mix(in oklab, var(--accent, var(--leaf)) 14%, transparent);
+  color: var(--accent, var(--leaf));
+}
+.hans-metric-icon svg { width: 14px; height: 14px; }
+.hans-metric-trend { font-size: 11px; color: var(--ink-3); display: inline-flex; gap: 3px; align-items: center; }
+.hans-metric-trend.up { color: var(--leaf); }
+.hans-metric-trend.down { color: var(--sky); }
+.hans-metric-value { font-family: 'Geist Mono', monospace; font-size: 40px; letter-spacing: -0.04em; font-weight: 500; margin-top: 14px; line-height: 1; display: flex; align-items: baseline; gap: 6px; font-feature-settings: 'tnum' 1; }
+.hans-metric-value .unit { font-size: 14px; color: var(--ink-3); letter-spacing: 0; font-family: 'Geist', sans-serif; }
+.hans-metric-foot { display: flex; align-items: center; justify-content: space-between; margin-top: 10px; font-size: 11px; color: var(--ink-4); }
+
+/* ── Time range selector ── */
+.hans-range {
+  display: inline-flex;
+  padding: 3px;
+  background: var(--bg-soft);
+  border: 1px solid var(--line-soft);
+  border-radius: 999px;
+  gap: 2px;
+}
+.hans-range button {
+  appearance: none; background: none; border: 0; cursor: pointer;
+  padding: 7px 14px;
+  border-radius: 999px;
+  color: var(--ink-3);
+  font-family: 'Geist', inherit;
+  font-size: 12px;
+  letter-spacing: 0.02em;
+  transition: background 0.15s, color 0.15s;
+}
+.hans-range button:hover { color: var(--ink-2); }
+.hans-range button.active {
+  background: color-mix(in oklab, var(--ink) 8%, transparent);
+  color: var(--ink);
+  box-shadow: var(--shadow-soft);
+}
+
+/* ── Charts grid ── */
+.hans-charts { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.hans-chart-card { padding: 20px 20px 12px; }
+.hans-chart-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+.hans-chart-head .label { display: flex; align-items: center; gap: 10px; }
+.hans-chart-head .label .dot { width: 8px; height: 8px; border-radius: 50%; }
+.hans-chart-head .name { font-size: 13px; color: var(--ink); font-weight: 500; }
+.hans-chart-head .unit { font-size: 12px; color: var(--ink-3); margin-left: 6px; font-family: 'Geist Mono', monospace; }
+.hans-chart-head .range-mini { display: flex; gap: 10px; font-size: 11px; color: var(--ink-4); font-family: 'Geist Mono', monospace; }
+.hans-chart-svg { width: 100%; display: block; }
+.hans-legend { display: flex; gap: 14px; flex-wrap: wrap; padding: 10px 4px 0; }
+.hans-legend-item { display: inline-flex; align-items: center; gap: 7px; font-size: 11px; color: var(--ink-3); }
+.hans-legend-item .dot { width: 8px; height: 8px; border-radius: 2px; }
+
+/* ── Sparrow grid ── */
+.hans-sparrows { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+.hans-sparrow {
+  position: relative;
+  border-radius: var(--r-lg);
+  border: 1px solid var(--line-soft);
+  background: var(--panel);
+  overflow: hidden;
+  cursor: pointer;
+  transition: transform 0.18s ease, border-color 0.18s, box-shadow 0.18s;
+  box-shadow: var(--shadow-card);
+}
+.hans-sparrow:hover { transform: translateY(-2px); border-color: color-mix(in oklab, var(--leaf) 30%, var(--line-soft)); }
+.hans-sparrow .thumb {
+  height: 110px;
+  background-size: cover; background-position: center;
+  position: relative;
+}
+.hans-sparrow .thumb::after {
+  content: '';
+  position: absolute; inset: 0;
+  background: linear-gradient(180deg, transparent 40%, color-mix(in oklab, var(--panel) 92%, transparent));
+}
+.hans-sparrow .body { padding: 14px 16px 16px; }
+.hans-sparrow .row1 { display: flex; align-items: center; justify-content: space-between; }
+.hans-sparrow .row1 .name { font-size: 14px; font-weight: 500; }
+.hans-sparrow .row1 .alias { color: var(--ink-3); font-weight: 400; margin-left: 6px; font-size: 12px; font-family: 'Geist Mono', monospace; }
+.hans-sparrow .row1 .sparrow-status { display: inline-flex; align-items: center; gap: 6px; font-size: 11px; color: var(--ink-3); }
+.hans-sparrow .row1 .sparrow-status .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--leaf); box-shadow: 0 0 6px var(--leaf); animation: hans-pulse 2s ease-in-out infinite; }
+.hans-sparrow .row1 .sparrow-status.off .dot { background: var(--ink-4); box-shadow: none; animation: none; }
+.hans-sparrow .mini-metrics { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; margin-top: 14px; }
+.hans-sparrow .mm { font-family: 'Geist Mono', monospace; font-size: 13px; color: var(--ink); display: flex; flex-direction: column; gap: 2px; }
+.hans-sparrow .mm .k { font-family: 'Geist', sans-serif; font-size: 10px; color: var(--ink-4); letter-spacing: 0.08em; text-transform: uppercase; }
+.hans-sparrow .mm small { font-size: 10px; color: var(--ink-3); margin-left: 2px; }
+
+/* ── Detail page ── */
+.hans-detail-grid { display: grid; grid-template-columns: 1fr 320px; gap: 20px; align-items: start; }
+.hans-detail-side .panel-h { font-size: 12px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--ink-3); margin: 0 0 12px; font-weight: 500; }
+.hans-kv { display: grid; grid-template-columns: 1fr auto; gap: 10px 16px; font-size: 13px; }
+.hans-kv .k { color: var(--ink-3); }
+.hans-kv .v { font-family: 'Geist Mono', monospace; color: var(--ink); }
+.hans-battery { display: flex; align-items: center; gap: 10px; margin-top: 14px; }
+.hans-battery .bar { flex: 1; height: 8px; background: var(--bg-soft); border-radius: 999px; overflow: hidden; border: 1px solid var(--line-soft); }
+.hans-battery .bar .fill { height: 100%; background: linear-gradient(90deg, var(--leaf), var(--amber)); border-radius: 999px; }
+.hans-battery .pct { font-family: 'Geist Mono', monospace; font-size: 12px; color: var(--ink-2); width: 40px; text-align: right; }
+.hans-back {
+  display: inline-flex; align-items: center; gap: 8px;
+  color: var(--ink-3); text-decoration: none; font-size: 13px;
+  margin-bottom: 14px; cursor: pointer;
+}
+.hans-back:hover { color: var(--ink); }
+
+/* ── Intro splash ── */
+.hans-intro {
+  position: fixed; inset: 0; z-index: 200;
+  background: var(--bg);
+  overflow: hidden;
+  display: grid; place-items: center;
+}
+.hans-intro.exit { animation: hans-intro-out 0.6s ease forwards; }
+.hans-intro-bg {
+  position: absolute; inset: 0;
+  background: url('/sparrows/living-night.png') center/cover no-repeat;
+  filter: saturate(0.95) brightness(0.55) contrast(1.04);
+  animation: hans-intro-zoom 4s ease forwards;
+}
+.hans-intro-bg::after {
+  content: '';
+  position: absolute; inset: 0;
+  background:
+    radial-gradient(ellipse at 30% 60%, transparent 0%, color-mix(in oklab, var(--bg) 80%, transparent) 80%),
+    linear-gradient(180deg, transparent 50%, color-mix(in oklab, var(--bg) 95%, transparent));
+}
+.hans-intro-content { position: relative; z-index: 2; text-align: center; }
+.hans-intro-mascot { width: 160px; height: 160px; margin: 0 auto 22px; filter: drop-shadow(0 18px 26px oklch(0 0 0 / 0.5)); }
+.hans-intro-title {
+  font-size: 64px; font-weight: 400; letter-spacing: -0.04em; margin: 0;
+  animation: hans-rise 0.9s cubic-bezier(0.2,0.7,0.2,1) 0.4s both;
+  color: var(--ink);
+}
+.hans-intro-title .glyph-h { color: var(--leaf); }
+.hans-intro-sub {
+  margin-top: 10px; font-size: 12px; letter-spacing: 0.34em; text-transform: uppercase; color: var(--ink-3);
+  animation: hans-rise 0.9s cubic-bezier(0.2,0.7,0.2,1) 0.7s both;
+}
+.hans-intro-foot {
+  position: absolute; bottom: 36px; left: 0; right: 0; text-align: center;
+  font-size: 11px; color: var(--ink-4); letter-spacing: 0.14em; text-transform: uppercase;
+  animation: hans-rise 0.9s cubic-bezier(0.2,0.7,0.2,1) 1.2s both;
+}
+.hans-intro-foot .dot { display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--leaf); box-shadow: 0 0 8px var(--leaf); margin-right: 8px; vertical-align: middle; animation: hans-pulse 1.6s ease-in-out infinite; }
+.hans-intro-skip {
+  position: absolute; top: 26px; right: 32px; z-index: 3;
+  appearance: none; border: 1px solid var(--line-soft); background: color-mix(in oklab, var(--bg) 60%, transparent); color: var(--ink-3);
+  padding: 7px 14px; border-radius: 999px; font-family: 'Geist', inherit; font-size: 12px;
+  cursor: pointer; letter-spacing: 0.06em;
+  backdrop-filter: blur(6px);
+}
+.hans-intro-skip:hover { color: var(--ink); border-color: var(--leaf); }
+
+/* particle */
+.hans-particle {
+  position: absolute; border-radius: 50%; background: var(--amber); opacity: 0.5; filter: blur(0.5px);
+  animation: hans-drift linear infinite;
+}
+
+@keyframes hans-intro-out   { to { opacity: 0; visibility: hidden; } }
+@keyframes hans-intro-zoom  { from { transform: scale(1.08); } to { transform: scale(1); } }
+@keyframes hans-rise        { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes hans-drift       { 0% { transform: translate3d(0,0,0); opacity: 0; } 10% { opacity: 0.7; } 90% { opacity: 0.7; } 100% { transform: translate3d(40px,-120px,0); opacity: 0; } }
+
+/* Mascot sway */
+.mascot-stem    { transform-origin: 80px 130px; animation: hans-sway 4.5s ease-in-out infinite; }
+.mascot-leaf-a  { transform-origin: 80px 90px; animation: hans-sway 4.5s ease-in-out infinite; }
+.mascot-leaf-b  { transform-origin: 80px 90px; animation: hans-sway 5.2s ease-in-out infinite reverse; }
+.mascot-leaf-c  { transform-origin: 80px 90px; animation: hans-sway 6s ease-in-out infinite; animation-delay: -1s; }
+@keyframes hans-sway { 0%, 100% { transform: rotate(-4deg); } 50% { transform: rotate(4deg); } }
+
+/* ── Responsive ── */
+@media (max-width: 1100px) {
+  .hans-metrics-row { grid-template-columns: repeat(2, 1fr); }
+  .hans-charts { grid-template-columns: 1fr; }
+  .hans-sparrows { grid-template-columns: repeat(2, 1fr); }
+  .hans-detail-grid { grid-template-columns: 1fr; }
+  .hans-hero-content { grid-template-columns: 1fr; }
+}
+@media (max-width: 640px) {
+  .hans-page { padding: 20px 16px 80px; }
+  .hans-nav { padding: 12px 16px; }
+  .hans-metrics-row { grid-template-columns: 1fr 1fr; }
+  .hans-sparrows { grid-template-columns: 1fr; }
+}

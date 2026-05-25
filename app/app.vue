@@ -1,38 +1,56 @@
 <template>
-  <div class="min-h-screen bg-gray-50">
-    <NuxtRouteAnnouncer />
+  <div>
+    <NuxtRouteAnnouncer/>
 
-    <!-- Navbar -->
-    <header class="sticky top-0 z-50 bg-white border-b border-gray-200">
-      <div class="max-w-7xl mx-auto px-4 h-14 flex items-center justify-between">
-        <NuxtLink to="/" class="flex items-center gap-2 font-semibold text-gray-900 tracking-tight">
-          <UIcon name="i-heroicons-home" class="text-blue-500 w-5 h-5" />
-          HANS
+    <!-- Intro splash (first visit only) -->
+    <HansIntro v-if="showIntro" @done="onIntroDone"/>
+
+    <template v-else>
+      <!-- Navbar -->
+      <nav class="hans-nav">
+        <NuxtLink to="/" class="hans-nav-brand">
+          <div class="logo">
+            <svg viewBox="0 0 24 24" fill="none" stroke="oklch(0.74 0.13 130)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M5 18V8M5 13h7M12 18V8"/>
+              <circle cx="18" cy="8" r="2" fill="oklch(0.79 0.12 80)" stroke="none"/>
+            </svg>
+          </div>
+          <div>
+            <div class="brand-title">HANS</div>
+            <div class="brand-sub">Ambient Network</div>
+          </div>
         </NuxtLink>
-        <nav class="flex items-center gap-1">
-          <UButton
-            v-for="link in navLinks"
-            :key="link.to"
-            :to="link.to"
-            variant="ghost"
-            color="neutral"
-            :icon="link.icon"
-            size="sm"
-          >
-            {{ link.label }}
-          </UButton>
-        </nav>
-      </div>
-    </header>
 
-    <NuxtPage />
+        <div class="hans-nav-right">
+          <div class="hans-nav-links">
+            <NuxtLink to="/" class="hans-nav-link" :class="{ active: route.path === '/' }">Dashboard</NuxtLink>
+            <NuxtLink to="/camera" class="hans-nav-link" :class="{ active: route.path === '/camera' }">Camera</NuxtLink>
+            <NuxtLink to="/settings" class="hans-nav-link" :class="{ active: route.path === '/settings' }">Settings</NuxtLink>
+          </div>
+          <div class="hans-nav-status">
+            <span class="dot"></span>
+            <span>sparrows online</span>
+          </div>
+        </div>
+      </nav>
+
+      <NuxtPage/>
+    </template>
   </div>
 </template>
 
 <script setup lang="ts">
-const navLinks = [
-  { to: '/', label: 'Dashboard', icon: 'i-heroicons-chart-bar' },
-  { to: '/camera', label: 'Kamera', icon: 'i-heroicons-video-camera' },
-  { to: '/settings', label: 'Einstellungen', icon: 'i-heroicons-cog-6-tooth' },
-]
+const route = useRoute()
+
+const showIntro = ref(false)
+
+onMounted(() => {
+  const seen = localStorage.getItem('hans-intro-seen')
+  if (!seen) showIntro.value = true
+})
+
+function onIntroDone() {
+  showIntro.value = false
+  localStorage.setItem('hans-intro-seen', '1')
+}
 </script>

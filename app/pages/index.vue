@@ -1,208 +1,291 @@
 <script setup lang="ts">
-interface SensorReading {
-  id: string
+interface Reading {
   sparrow_id: string
   metric: string
   value: number
   recorded_at: string
 }
 
+const METRICS = [
+  { id: 'temperature', name: 'Temperature', unit: '°C',  color: 'var(--clay)', icon: 'thermo', decimals: 1 },
+  { id: 'humidity',    name: 'Humidity',    unit: '%',   color: 'var(--sky)',  icon: 'drop',   decimals: 0 },
+  { id: 'pressure',   name: 'Pressure',    unit: 'hPa', color: 'var(--plum)', icon: 'pres',   decimals: 1 },
+]
+
+const SPARROW_IMAGES: Record<string, string> = {
+  living:  '/sparrows/living-day.png',
+  bedroom: '/sparrows/bedroom.png',
+  kitchen: '/sparrows/kitchen.png',
+  balcony: '/sparrows/balcony.png',
+  study:   '/sparrows/living-night.png',
+}
+function sparrowImage(id: string) {
+  for (const [key, img] of Object.entries(SPARROW_IMAGES)) {
+    if (id.toLowerCase().includes(key)) return img
+  }
+  return '/sparrows/living-day.png'
+}
+
+const RANGE_HOURS: Record<string, number> = { '1h': 1, '6h': 6, '24h': 24, '7d': 168 }
+const RANGES = ['1h', '6h', '24h', '7d']
+const selectedRange = ref('24h')
+
 const supabase = useSupabaseClient()
 
-const ranges = [
-  { label: '1h', hours: 1 },
-  { label: '6h', hours: 6 },
-  { label: '24h', hours: 24 },
-  { label: '7d', hours: 168 },
-]
-const selectedRange = ref(ranges[2])
-
 const since = computed(() =>
-  new Date(Date.now() - selectedRange.value.hours * 60 * 60 * 1000).toISOString()
+  new Date(Date.now() - RANGE_HOURS[selectedRange.value] * 60 * 60 * 1000).toISOString()
 )
 
-const { data: rows, error, refresh, status } = await useAsyncData(
-  'sensor_readings',
+const { data: rows, status, refresh } = await useAsyncData<Reading[]>(
+  'dashboard_readings',
   async () => {
     const { data, error } = await supabase
       .from('sensor_readings')
-      .select('id, sparrow_id, metric, value, recorded_at')
+      .select('sparrow_id, metric, value, recorded_at')
       .gte('recorded_at', since.value)
       .order('recorded_at', { ascending: true })
     if (error) throw error
-    return (data ?? []) as SensorReading[]
+    return (data ?? []) as Reading[]
   },
   { watch: [since] }
 )
 
-const byMetric = computed(() => {
-  const map = new Map<string, SensorReading[]>()
+// Derived data
+const sparrows = computed(() =>
+  [...new Set((rows.value ?? []).map(r => r.sparrow_id))].sort()
+)
+
+// Group readings by sparrow → metric → sorted readings
+const byGroup = computed(() => {
+  const map = new Map<string, Map<string, Reading[]>>()
   for (const r of rows.value ?? []) {
-    const arr = map.get(r.metric) ?? []
+    if (!map.has(r.sparrow_id)) map.set(r.sparrow_id, new Map())
+    const sm = map.get(r.sparrow_id)!
+    const arr = sm.get(r.metric) ?? []
     arr.push(r)
-    map.set(r.metric, arr)
+    sm.set(r.metric, arr)
   }
   return map
 })
 
-const metrics = computed(() => [...byMetric.value.keys()].sort())
-
-const latestPerMetric = computed(() => {
-  const result: Record<string, { value: number; unit: string }> = {}
-  for (const [metric, readings] of byMetric.value) {
-    const latest = readings.reduce((a, b) => a.recorded_at > b.recorded_at ? a : b)
-    result[metric] = { value: latest.value, unit: metaFor(metric).unit }
-  }
-  return result
-})
-
-const sparrows = computed(() => [...new Set((rows.value ?? []).map(r => r.sparrow_id))].sort())
-
-const lastRefreshed = ref(new Date())
-async function handleRefresh() {
-  await refresh()
-  lastRefreshed.value = new Date()
+// Latest value per sparrow per metric
+function latestValue(sparrowId: string, metricId: string): number | null {
+  const readings = byGroup.value.get(sparrowId)?.get(metricId)
+  if (!readings?.length) return null
+  return readings[readings.length - 1].value
 }
 
-function metaFor(metric: string): { icon: string; unit: string; label: string } {
-  const map: Record<string, { icon: string; unit: string; label: string }> = {
-    temperature: { icon: 'i-heroicons-fire', unit: '°C', label: 'Temperatur' },
-    humidity:    { icon: 'i-heroicons-cloud', unit: '%', label: 'Luftfeuchtigkeit' },
-    pressure:    { icon: 'i-heroicons-arrow-trending-up', unit: 'hPa', label: 'Luftdruck' },
-    co2:         { icon: 'i-heroicons-beaker', unit: 'ppm', label: 'CO₂' },
-    gas:         { icon: 'i-heroicons-beaker', unit: 'Ω', label: 'Gas' },
-  }
-  return map[metric] ?? { icon: 'i-heroicons-signal', unit: '', label: metric }
+// House average for a metric
+function houseAvg(metricId: string): number | null {
+  const vals = sparrows.value
+    .map(s => latestValue(s, metricId))
+    .filter((v): v is number => v !== null)
+  if (!vals.length) return null
+  return vals.reduce((a, b) => a + b, 0) / vals.length
 }
+
+// Evenly-sampled series for sparkline/chart (returns last N values)
+function timeSeries(sparrowId: string, metricId: string, points = 60): number[] {
+  const readings = byGroup.value.get(sparrowId)?.get(metricId) ?? []
+  if (!readings.length) return []
+  // Sample evenly
+  const step = Math.max(1, Math.floor(readings.length / points))
+  const sampled: number[] = []
+  for (let i = 0; i < readings.length; i += step) sampled.push(readings[i].value)
+  return sampled
+}
+
+// Aggregate sparkline (mean across sparrows)
+function aggSeries(metricId: string): number[] {
+  const series = sparrows.value.map(s => timeSeries(s, metricId))
+  const len = Math.max(...series.map(s => s.length), 0)
+  if (!len) return []
+  return Array.from({ length: len }, (_, i) => {
+    const vals = series.map(s => s[Math.round((i / (len - 1)) * (s.length - 1)) || 0]).filter(Boolean)
+    return vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : 0
+  })
+}
+
+// Multi-sparrow series for multi-line charts
+function sparrowSeries(metricId: string): Record<string, number[]> {
+  const out: Record<string, number[]> = {}
+  for (const id of sparrows.value) {
+    const s = timeSeries(id, metricId)
+    if (s.length) out[id] = s
+  }
+  return out
+}
+
+const SPARROW_COLORS = ['var(--leaf)', 'var(--amber)', 'var(--clay)', 'var(--sky)', 'var(--plum)']
+function sparrowColor(idx: number) { return SPARROW_COLORS[idx % SPARROW_COLORS.length] }
+
+// Trend: difference between last 20% and previous 20% of readings
+function trend(sparrowId: string, metricId: string): number {
+  const readings = byGroup.value.get(sparrowId)?.get(metricId) ?? []
+  if (readings.length < 4) return 0
+  const chunk = Math.max(2, Math.floor(readings.length * 0.2))
+  const recent  = readings.slice(-chunk).reduce((a, r) => a + r.value, 0) / chunk
+  const earlier = readings.slice(-chunk * 2, -chunk).reduce((a, r) => a + r.value, 0) / chunk
+  return recent - earlier
+}
+function avgTrend(metricId: string): number {
+  const vals = sparrows.value.map(s => trend(s, metricId))
+  return vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : 0
+}
+
+// Hero text
+const heroTemp = computed(() => houseAvg('temperature'))
+const heroHum  = computed(() => houseAvg('humidity'))
+
+const now = new Date()
+const hour = now.getHours()
+const greeting = hour < 6 ? 'Quiet hours' : hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening'
+const timeStr = now.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })
 </script>
 
 <template>
-  <div>
-    <!-- Hero Banner -->
-    <div
-      class="relative h-44 bg-gradient-to-br from-blue-600 to-indigo-700 overflow-hidden"
-    >
-      <div class="absolute inset-0 bg-black/20" />
-      <div class="relative h-full max-w-7xl mx-auto px-4 flex flex-col justify-end pb-5">
-        <h1 class="text-2xl font-semibold text-white tracking-tight">HANS</h1>
-        <p class="text-sm text-blue-100 mt-0.5">
-          <span v-if="status === 'pending'">Lade…</span>
-          <span v-else-if="status === 'success'">
-            {{ sparrows.length }} Sparrow{{ sparrows.length !== 1 ? 's' : '' }} ·
-            aktualisiert {{ lastRefreshed.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' }) }}
-          </span>
-        </p>
+  <div class="hans-page">
+
+    <!-- HERO -->
+    <div class="hans-hero">
+      <div class="hans-hero-img" style="background-image: url('/sparrows/living-day.png')"></div>
+      <div class="hans-hero-content">
+        <div>
+          <div class="hans-hero-greeting">{{ greeting }} — {{ timeStr }} local</div>
+          <h1 class="hans-hero-title">
+            <template v-if="heroTemp !== null && heroHum !== null">
+              The house feels <em>{{ heroTemp.toFixed(1) }}°</em> and <em>{{ Math.round(heroHum!) }}%</em>.
+            </template>
+            <template v-else>
+              HANS is listening.
+            </template>
+          </h1>
+          <div class="hans-hero-sub">
+            <template v-if="sparrows.length">
+              {{ sparrows.length }} sparrow{{ sparrows.length !== 1 ? 's' : '' }} reporting in the last {{ selectedRange }}.
+            </template>
+            <template v-else>
+              No sparrows sending data in the selected time range.
+            </template>
+          </div>
+          <div class="hans-hero-tags">
+            <span class="hans-chip"><span class="dot" style="background:var(--leaf)"></span>air · monitored</span>
+            <span class="hans-chip"><span class="dot" style="background:var(--sky)"></span>humidity · tracked</span>
+            <span class="hans-chip hans-mono">{{ sparrows.length }} / {{ sparrows.length }} online</span>
+          </div>
+        </div>
+        <div class="hans-hero-meta">
+          <div class="hans-pill hans-mono">{{ new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) }}</div>
+          <div class="hans-pill hans-mono">data · {{ selectedRange }} window</div>
+        </div>
       </div>
     </div>
 
-    <div class="max-w-7xl mx-auto px-4 py-6 space-y-8">
+    <!-- Empty state -->
+    <div v-if="status === 'success' && !sparrows.length" style="text-align:center;padding:80px 0;color:var(--ink-3)">
+      <div style="font-size:11px;letter-spacing:0.2em;text-transform:uppercase;margin-bottom:12px">No data</div>
+      <div style="font-size:22px;color:var(--ink)">Waiting for sparrows to report.</div>
+      <div style="font-size:13px;margin-top:8px">Data will appear here once your Sparrows start sending.</div>
+    </div>
 
-      <!-- Error -->
-      <UAlert
-        v-if="error"
-        color="error"
-        icon="i-heroicons-exclamation-triangle"
-        :description="error.message"
-        title="Fehler beim Laden"
-      />
+    <template v-else>
 
-      <!-- Empty -->
-      <div
-        v-else-if="status === 'success' && metrics.length === 0"
-        class="text-center py-24 text-gray-400"
-      >
-        <UIcon name="i-heroicons-signal-slash" class="w-10 h-10 mx-auto mb-3" />
-        <p class="text-base">Keine Messwerte im gewählten Zeitraum.</p>
-        <p class="text-sm mt-1">Sobald Sparrows senden, erscheinen hier die Daten.</p>
+      <!-- METRICS -->
+      <div class="hans-section-head">
+        <h2>Current ambient · house average</h2>
+        <span class="meta">across {{ sparrows.length }} sparrows</span>
+      </div>
+      <div class="hans-metrics-row">
+        <HansMetricCard
+          v-for="m in METRICS"
+          :key="m.id"
+          :metric="m"
+          :value="houseAvg(m.id) ?? 0"
+          :trend="avgTrend(m.id)"
+          :spark-data="aggSeries(m.id)"
+          label="avg · all sparrows"
+          :range-label="`last ${selectedRange}`"
+        />
       </div>
 
-      <template v-else>
-
-        <!-- Stat Cards -->
-        <div class="space-y-2">
-          <div class="flex items-center justify-between">
-            <h2 class="text-xs font-semibold uppercase tracking-widest text-gray-400">Aktuell</h2>
-          </div>
-          <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            <UCard
-              v-for="metric in metrics"
-              :key="metric"
-              class="bg-white shadow-sm"
-            >
-              <div class="flex items-start justify-between">
-                <div class="space-y-1">
-                  <p class="text-xs text-gray-400 uppercase tracking-wide">{{ metaFor(metric).label }}</p>
-                  <p class="text-2xl font-mono font-semibold text-gray-900">
-                    {{ latestPerMetric[metric]?.value != null
-                        ? Number(latestPerMetric[metric].value).toFixed(1)
-                        : '—' }}
-                    <span class="text-sm font-sans font-normal text-gray-400">{{ metaFor(metric).unit }}</span>
-                  </p>
-                </div>
-                <UIcon :name="metaFor(metric).icon" class="w-5 h-5 text-blue-400 mt-0.5" />
-              </div>
-            </UCard>
-          </div>
+      <!-- CHARTS -->
+      <div class="hans-section-head">
+        <h2>Trends · all sparrows</h2>
+        <div class="hans-range">
+          <button
+            v-for="r in RANGES"
+            :key="r"
+            :class="{ active: selectedRange === r }"
+            @click="selectedRange = r"
+          >{{ r }}</button>
         </div>
-
-        <!-- Charts -->
-        <div class="space-y-3">
-          <div class="flex items-center justify-between">
-            <h2 class="text-xs font-semibold uppercase tracking-widest text-gray-400">Verlauf</h2>
-            <div class="flex gap-1">
-              <UButton
-                v-for="r in ranges"
-                :key="r.label"
-                size="xs"
-                :variant="selectedRange.label === r.label ? 'solid' : 'ghost'"
-                :color="selectedRange.label === r.label ? 'primary' : 'neutral'"
-                @click="selectedRange = r"
-              >
-                {{ r.label }}
-              </UButton>
+      </div>
+      <div class="hans-charts">
+        <div v-for="m in METRICS" :key="m.id" class="hans-card hans-chart-card">
+          <div class="hans-chart-head">
+            <div class="label">
+              <span class="dot" :style="{ background: m.color }"></span>
+              <span class="name">{{ m.name }}<span class="unit">· {{ m.unit }}</span></span>
+            </div>
+            <div class="range-mini">
+              <span>{{ selectedRange }}</span>
             </div>
           </div>
-
-          <UCard
-            v-for="metric in metrics"
-            :key="metric"
-            class="bg-white shadow-sm"
-          >
-            <template #header>
-              <div class="flex items-center gap-2">
-                <UIcon :name="metaFor(metric).icon" class="w-4 h-4 text-blue-400" />
-                <span class="font-medium text-gray-800">{{ metaFor(metric).label }}</span>
-                <span class="text-xs text-gray-400">{{ metaFor(metric).unit }}</span>
-              </div>
-            </template>
-            <TimeSeriesChart :metric="metric" :readings="byMetric.get(metric) ?? []" />
-          </UCard>
-        </div>
-
-        <!-- Sparrow Links -->
-        <div v-if="sparrows.length" class="space-y-2">
-          <h2 class="text-xs font-semibold uppercase tracking-widest text-gray-400">Sparrows</h2>
-          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-            <NuxtLink
-              v-for="sparrow in sparrows"
-              :key="sparrow"
-              :to="`/sensors/${sparrow}`"
-              class="block"
-            >
-              <UCard class="bg-white shadow-sm hover:shadow-md transition-shadow cursor-pointer">
-                <div class="flex items-center justify-between">
-                  <div class="flex items-center gap-3">
-                    <div class="w-2 h-2 rounded-full bg-green-400" />
-                    <span class="font-medium text-gray-800 text-sm">{{ sparrow }}</span>
-                  </div>
-                  <UIcon name="i-heroicons-chevron-right" class="w-4 h-4 text-gray-300" />
-                </div>
-              </UCard>
-            </NuxtLink>
+          <HansLineChart
+            :series="sparrowSeries(m.id)"
+            :line-colors="Object.fromEntries(sparrows.map((s, i) => [s, sparrowColor(i)]))"
+            :default-color="m.color"
+            :decimals="m.decimals"
+            :range="selectedRange"
+            :height="170"
+          />
+          <div class="hans-legend">
+            <div v-for="(s, i) in sparrows" :key="s" class="hans-legend-item">
+              <span class="dot" :style="{ background: sparrowColor(i) }"></span>
+              {{ s }}
+            </div>
           </div>
         </div>
+      </div>
 
-      </template>
-    </div>
+      <!-- SPARROWS -->
+      <div class="hans-section-head">
+        <h2>Sparrows</h2>
+        <span class="meta">tap a card for the full nest</span>
+      </div>
+      <div class="hans-sparrows">
+        <NuxtLink
+          v-for="(s, i) in sparrows"
+          :key="s"
+          :to="`/sensors/${s}`"
+          style="text-decoration:none"
+        >
+          <div class="hans-sparrow">
+            <div class="thumb" :style="{ backgroundImage: `url(${sparrowImage(s)})` }"></div>
+            <div class="body">
+              <div class="row1">
+                <div class="name">
+                  {{ s }}
+                  <span class="alias">sparrow-{{ String(i + 1).padStart(2, '0') }}</span>
+                </div>
+                <div class="sparrow-status">
+                  <span class="dot"></span>
+                  <span>online</span>
+                </div>
+              </div>
+              <div class="mini-metrics">
+                <div v-for="m in METRICS" :key="m.id" class="mm">
+                  <span class="k">{{ m.id === 'temperature' ? 'Temp' : m.id === 'humidity' ? 'Hum' : 'Pres' }}</span>
+                  <span>
+                    {{ latestValue(s, m.id) !== null ? (m.decimals === 0 ? Math.round(latestValue(s, m.id)!) : latestValue(s, m.id)!.toFixed(m.decimals)) : '—' }}<small>{{ m.unit }}</small>
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </NuxtLink>
+      </div>
+
+    </template>
   </div>
 </template>
