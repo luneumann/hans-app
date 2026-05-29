@@ -56,11 +56,12 @@ const dayLabels = computed(() => {
 
 function comfortColor(score: number | null): string {
   if (score === null) return 'color-mix(in oklab, var(--ink-4) 14%, transparent)'
-  // Map 0-100 to hue: 30 (clay/red) → 130 (leaf/green)
-  const hue = 30 + (score / 100) * 100
-  const chroma = 0.08 + (score / 100) * 0.08
-  const alpha = 0.35 + (score / 100) * 0.5
-  return `oklch(0.62 ${chroma} ${hue} / ${alpha})`
+  // Low = soft pastel rose (12), high = mint emerald (155). Pretty across the spectrum.
+  const t = score / 100
+  const hue = 12 + t * 143         // 12 → 155
+  const chroma = 0.06 + t * 0.12
+  const alpha = 0.40 + t * 0.50
+  return `oklch(0.74 ${chroma} ${hue} / ${alpha})`
 }
 
 const cells = computed(() => {
@@ -183,7 +184,7 @@ const cells = computed(() => {
   width: 60px;
   height: 8px;
   border-radius: 2px;
-  background: linear-gradient(90deg, oklch(0.62 0.1 30 / 0.4), oklch(0.62 0.14 80 / 0.5), oklch(0.7 0.16 130 / 0.85));
+  background: linear-gradient(90deg, oklch(0.74 0.12 12 / 0.45), oklch(0.78 0.10 85 / 0.55), oklch(0.78 0.18 155 / 0.9));
   border: 1px solid var(--line-soft);
 }
 .hans-heatmap-legend .meta { margin-left: 12px; font-family: 'Geist Mono', monospace; }
