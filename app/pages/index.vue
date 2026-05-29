@@ -137,10 +137,20 @@ function avgTrend(metricId: string): number {
 const heroTemp = computed(() => houseAvg('temperature'))
 const heroHum  = computed(() => houseAvg('humidity'))
 
-const now = new Date()
-const hour = now.getHours()
-const greeting = hour < 6 ? 'Quiet hours' : hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening'
-const timeStr = now.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })
+const now = ref(new Date())
+const hour = computed(() => now.value.getHours())
+const greeting = computed(() => hour.value < 6 ? 'Quiet hours' : hour.value < 12 ? 'Good morning' : hour.value < 18 ? 'Good afternoon' : 'Good evening')
+const timeStr = computed(() => now.value.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' }))
+
+// Auto-refresh every 5 seconds
+let refreshTimer: ReturnType<typeof setInterval>
+onMounted(() => {
+  refreshTimer = setInterval(() => {
+    now.value = new Date()
+    refresh()
+  }, 5000)
+})
+onUnmounted(() => clearInterval(refreshTimer))
 </script>
 
 <template>
