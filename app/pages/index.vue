@@ -7,9 +7,10 @@ interface Reading {
 }
 
 const METRICS = [
-  { id: 'temperature', name: 'Temperature', unit: '°C',  color: 'var(--clay)', icon: 'thermo', decimals: 1 },
-  { id: 'humidity',    name: 'Humidity',    unit: '%',   color: 'var(--sky)',  icon: 'drop',   decimals: 0 },
-  { id: 'pressure',   name: 'Pressure',    unit: 'hPa', color: 'var(--plum)', icon: 'pres',   decimals: 1 },
+  { id: 'temperature', name: 'Temperature', unit: '°C',  color: 'var(--clay)',  icon: 'thermo', decimals: 1, short: 'Temp' },
+  { id: 'humidity',    name: 'Humidity',    unit: '%',   color: 'var(--sky)',   icon: 'drop',   decimals: 0, short: 'Hum'  },
+  { id: 'pressure',    name: 'Pressure',    unit: 'hPa', color: 'var(--plum)',  icon: 'pres',   decimals: 1, short: 'Pres' },
+  { id: 'light',       name: 'Light',       unit: 'lx',  color: 'var(--amber)', icon: 'sun',    decimals: 0, short: 'Lux'  },
 ]
 
 const SPARROW_IMAGES: Record<string, string> = {
@@ -347,6 +348,8 @@ onUnmounted(() => {
             :pressure="houseAvg('pressure')"
             :dew-point="houseDewPoint"
             :pressure-delta="housePressureDelta"
+            :light="houseAvg('light')"
+            :hour="hour"
             :warmest-room="warmestRoom"
             :coolest-room="coolestRoom"
             :online-count="onlineCount"
@@ -464,7 +467,7 @@ onUnmounted(() => {
               </div>
               <div class="mini-metrics">
                 <div v-for="m in METRICS" :key="m.id" class="mm">
-                  <span class="k">{{ m.id === 'temperature' ? 'Temp' : m.id === 'humidity' ? 'Hum' : 'Pres' }}</span>
+                  <span class="k">{{ m.short }}</span>
                   <span>
                     {{ latestValue(s, m.id) !== null ? (m.decimals === 0 ? Math.round(latestValue(s, m.id)!) : latestValue(s, m.id)!.toFixed(m.decimals)) : '—' }}<small>{{ m.unit }}</small>
                   </span>

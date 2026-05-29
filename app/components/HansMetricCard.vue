@@ -56,6 +56,17 @@ const icons = {
     h('path', { d: 'M5 19c0-8 7-14 14-14 0 7-6 14-14 14z' }),
     h('path', { d: 'M5 19c4-4 8-6 12-7' }),
   ]),
+  sun: () => h('svg', { viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', 'stroke-width': '1.6', 'stroke-linecap': 'round', 'stroke-linejoin': 'round' }, [
+    h('circle', { cx: '12', cy: '12', r: '3.6' }),
+    h('line', { x1: '12', y1: '3', x2: '12', y2: '5' }),
+    h('line', { x1: '12', y1: '19', x2: '12', y2: '21' }),
+    h('line', { x1: '3', y1: '12', x2: '5', y2: '12' }),
+    h('line', { x1: '19', y1: '12', x2: '21', y2: '12' }),
+    h('line', { x1: '5.6', y1: '5.6', x2: '7.1', y2: '7.1' }),
+    h('line', { x1: '16.9', y1: '16.9', x2: '18.4', y2: '18.4' }),
+    h('line', { x1: '5.6', y1: '18.4', x2: '7.1', y2: '16.9' }),
+    h('line', { x1: '16.9', y1: '7.1', x2: '18.4', y2: '5.6' }),
+  ]),
   up: () => h('svg', { viewBox: '0 0 12 12', fill: 'none', stroke: 'currentColor', 'stroke-width': '2', 'stroke-linecap': 'round', 'stroke-linejoin': 'round' }, [
     h('path', { d: 'M3 8l3-3 3 3' }),
   ]),

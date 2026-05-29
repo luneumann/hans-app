@@ -390,7 +390,7 @@ body::before {
 .hans-sparrow .row1 .sparrow-status { display: inline-flex; align-items: center; gap: 6px; font-size: 11px; color: var(--ink-3); }
 .hans-sparrow .row1 .sparrow-status .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--leaf); box-shadow: 0 0 6px var(--leaf); animation: hans-pulse 2s ease-in-out infinite; }
 .hans-sparrow .row1 .sparrow-status.off .dot { background: var(--ink-4); box-shadow: none; animation: none; }
-.hans-sparrow .mini-metrics { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; margin-top: 14px; }
+.hans-sparrow .mini-metrics { display: grid; grid-template-columns: repeat(auto-fit, minmax(56px, 1fr)); gap: 6px 8px; margin-top: 14px; }
 .hans-sparrow .mm { font-family: 'Geist Mono', monospace; font-size: 13px; color: var(--ink); display: flex; flex-direction: column; gap: 2px; }
 .hans-sparrow .mm .k { font-family: 'Geist', sans-serif; font-size: 10px; color: var(--ink-4); letter-spacing: 0.08em; text-transform: uppercase; }
 .hans-sparrow .mm small { font-size: 10px; color: var(--ink-3); margin-left: 2px; }

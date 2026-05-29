@@ -9,6 +9,8 @@ const props = defineProps<{
   pressure: number | null
   dewPoint: number | null
   pressureDelta: number  // hPa change over the window
+  light: number | null    // average illuminance in lux
+  hour: number             // current local hour, 0-23, for context-aware light phrasing
   warmestRoom: { name: string; value: number } | null
   coolestRoom: { name: string; value: number } | null
   onlineCount: number
@@ -32,6 +34,23 @@ function humPhrase(h: number): string {
   return 'damp'
 }
 
+// Light phrasing is time-aware — 200 lx at midnight is bright, at noon is dim
+function lightPhrase(lux: number, hour: number): { phrase: string; aside: string | null } {
+  const night = hour < 6 || hour >= 22
+  if (night) {
+    if (lux > 200) return { phrase: 'still lit', aside: 'lights are on past quiet hours' }
+    if (lux > 20)  return { phrase: 'dimly lit', aside: null }
+    if (lux > 2)   return { phrase: 'softly dark', aside: null }
+    return { phrase: 'fully dark', aside: null }
+  }
+  // day
+  if (lux > 5000) return { phrase: 'sunlit', aside: 'direct daylight pouring in' }
+  if (lux > 800)  return { phrase: 'bright', aside: null }
+  if (lux > 200)  return { phrase: 'softly lit', aside: null }
+  if (lux > 30)   return { phrase: 'dim', aside: null }
+  return { phrase: 'shaded', aside: 'unusually dark for daytime' }
+}
+
 const text = computed(() => {
   if (props.temp === null || props.humidity === null) {
     return 'The network is listening, but the sparrows have not sent enough data yet to describe the house.'
@@ -39,6 +58,12 @@ const text = computed(() => {
   const parts: string[] = []
 
   parts.push(`The house feels **${tempPhrase(props.temp)}** at ${props.temp.toFixed(1)}° and the air is **${humPhrase(props.humidity)}** at ${Math.round(props.humidity)}%.`)
+
+  if (props.light !== null) {
+    const { phrase, aside } = lightPhrase(props.light, props.hour)
+    const luxStr = props.light < 100 ? props.light.toFixed(1) : Math.round(props.light).toString()
+    parts.push(`Rooms are **${phrase}** at ${luxStr} lx${aside ? ` — ${aside}` : ''}.`)
+  }
 
   if (props.warmestRoom && props.coolestRoom && props.warmestRoom.name !== props.coolestRoom.name) {
     const delta = props.warmestRoom.value - props.coolestRoom.value

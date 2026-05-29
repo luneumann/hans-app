@@ -1,10 +1,14 @@
 /**
  * Sparrow Sensor Firmware
- * ESP8266 + BME280 → Supabase sensor_readings via HTTPS POST
+ * ESP8266 + BME280 + BH1750 → Supabase sensor_readings via HTTPS POST
  *
  * Board: ESP8266 (e.g. Wemos D1 Mini)
  * Libraries: ESP8266WiFi, ESP8266HTTPClient, WiFiClientSecure,
- *            ArduinoJson, Adafruit_BME280, Adafruit_Sensor
+ *            ArduinoJson, Adafruit_BME280, Adafruit_Sensor, BH1750
+ *
+ * Sensors on the I2C bus:
+ *   BME280  →  temperature, humidity, pressure
+ *   BH1750  →  illuminance (lux)
  */
 
 #include <ESP8266WiFi.h>
@@ -14,6 +18,7 @@
 #include <Wire.h>
 #include <Adafruit_BME280.h>
 #include <Adafruit_Sensor.h>
+#include <BH1750.h>
 
 // ─── Configuration ────────────────────────────────────────────────────────────
 
@@ -36,6 +41,8 @@
 // ─── Globals ──────────────────────────────────────────────────────────────────
 
 Adafruit_BME280 bme;
+BH1750 lightMeter;
+bool hasLight = false;
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -116,6 +123,24 @@ void setup() {
   Serial.printf("[BME280] temp=%.2f°C  hum=%.2f%%  pres=%.2fhPa\n",
                 temperature, humidity, pressure);
 
+  // ── BH1750 init (illuminance / lux) ──────────────────────────────────────
+  // Default I2C address 0x23 (ADD pin low). Try 0x5C if your board uses it.
+  if (lightMeter.begin(BH1750::ONE_TIME_HIGH_RES_MODE, 0x23)) {
+    hasLight = true;
+  } else if (lightMeter.begin(BH1750::ONE_TIME_HIGH_RES_MODE, 0x5C)) {
+    hasLight = true;
+  } else {
+    Serial.println("[BH1750] Not found — skipping light reading");
+  }
+
+  float light = NAN;
+  if (hasLight) {
+    // ONE_TIME_HIGH_RES takes ~120 ms to complete
+    delay(180);
+    light = lightMeter.readLightLevel();        // lux
+    Serial.printf("[BH1750] light=%.1f lx\n", light);
+  }
+
   // ── WiFi ─────────────────────────────────────────────────────────────────
   if (!connectWiFi()) {
     Serial.println("[WiFi] Connect timeout — sleeping");
@@ -129,13 +154,15 @@ void setup() {
   client.setInsecure(); // acceptable: anon key + RLS INSERT-only
 
   // ── POST each metric ─────────────────────────────────────────────────────
-  struct { const char* name; float val; } metrics[] = {
-    { "temperature", temperature },
-    { "humidity",    humidity    },
-    { "pressure",    pressure    },
+  struct { const char* name; float val; bool send; } metrics[] = {
+    { "temperature", temperature, true       },
+    { "humidity",    humidity,    true       },
+    { "pressure",    pressure,    true       },
+    { "light",       light,       hasLight   },
   };
 
   for (auto& m : metrics) {
+    if (!m.send || isnan(m.val)) continue;
     int status = postReading(client, m.name, m.val);
     Serial.printf("[POST] %s → HTTP %d\n", m.name, status);
     // Brief pause between requests to avoid hammering the API

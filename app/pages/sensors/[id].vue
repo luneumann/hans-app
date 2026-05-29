@@ -7,9 +7,10 @@ interface Reading {
 }
 
 const METRICS = [
-  { id: 'temperature', name: 'Temperature', unit: '°C',  color: 'var(--clay)', icon: 'thermo', decimals: 1 },
-  { id: 'humidity',    name: 'Humidity',    unit: '%',   color: 'var(--sky)',  icon: 'drop',   decimals: 0 },
-  { id: 'pressure',   name: 'Pressure',    unit: 'hPa', color: 'var(--plum)', icon: 'pres',   decimals: 1 },
+  { id: 'temperature', name: 'Temperature', unit: '°C',  color: 'var(--clay)',  icon: 'thermo', decimals: 1 },
+  { id: 'humidity',    name: 'Humidity',    unit: '%',   color: 'var(--sky)',   icon: 'drop',   decimals: 0 },
+  { id: 'pressure',    name: 'Pressure',    unit: 'hPa', color: 'var(--plum)',  icon: 'pres',   decimals: 1 },
+  { id: 'light',       name: 'Light',       unit: 'lx',  color: 'var(--amber)', icon: 'sun',    decimals: 0 },
 ]
 
 const SPARROW_IMAGES: Record<string, string> = {
@@ -139,11 +140,12 @@ const isOnline = computed(() => {
   return (Date.now() - new Date(all[all.length - 1].recorded_at).getTime()) < 11 * 60 * 1000
 })
 
-// Data health: actual wake cycles vs expected for the window
+// Data health: actual wake cycles vs expected for the window.
+// We use temperature reading count as the cycle proxy — robust to optional
+// metrics (e.g. light may be missing if no BH1750 is connected).
 const dataHealth = computed(() => {
   const hours = RANGE_HOURS[selectedRange.value]
-  const total = (rows.value ?? []).length
-  const actualCycles = Math.round(total / 3) // 3 metrics per wake cycle
+  const actualCycles = byMetric.value.get('temperature')?.length ?? 0
   const expectedCycles = hours * 12           // every 5 min = 12/hr
   return {
     actual: actualCycles,
