@@ -119,6 +119,39 @@ function sparrowSeries(metricId: string): Record<string, number[]> {
 const SPARROW_COLORS = ['var(--leaf)', 'var(--amber)', 'var(--clay)', 'var(--sky)', 'var(--plum)']
 function sparrowColor(idx: number) { return SPARROW_COLORS[idx % SPARROW_COLORS.length] }
 
+// Online: last temperature reading within 11 min (5-min cycle + margin)
+function isOnlineSparrow(id: string): boolean {
+  const readings = byGroup.value.get(id)?.get('temperature') ?? []
+  if (!readings.length) return false
+  return (Date.now() - new Date(readings[readings.length - 1].recorded_at).getTime()) < 11 * 60 * 1000
+}
+const onlineCount = computed(() => sparrows.value.filter(isOnlineSparrow).length)
+
+// Dew point (Magnus approximation) for house average
+const houseDewPoint = computed(() => {
+  const T = houseAvg('temperature')
+  const RH = houseAvg('humidity')
+  if (T === null || RH === null) return null
+  return +(T - (100 - RH) / 5).toFixed(1)
+})
+
+// Pressure tendency across all sparrows combined
+const housePressureTendency = computed(() => {
+  const all: Reading[] = []
+  for (const id of sparrows.value) {
+    all.push(...(byGroup.value.get(id)?.get('pressure') ?? []))
+  }
+  all.sort((a, b) => a.recorded_at.localeCompare(b.recorded_at))
+  if (all.length < 6) return null
+  const chunk = Math.max(3, Math.floor(all.length * 0.2))
+  const recent  = all.slice(-chunk).reduce((a, r) => a + r.value, 0) / chunk
+  const earlier = all.slice(0, chunk).reduce((a, r) => a + r.value, 0) / chunk
+  const delta = +(recent - earlier).toFixed(1)
+  if (delta > 0.5) return { label: 'rising', color: 'var(--leaf)' }
+  if (delta < -0.5) return { label: 'falling', color: 'var(--clay)' }
+  return null // stable = no chip, nothing to say
+})
+
 // Trend: difference between last 20% and previous 20% of readings
 function trend(sparrowId: string, metricId: string): number {
   const readings = byGroup.value.get(sparrowId)?.get(metricId) ?? []
@@ -179,9 +212,15 @@ onUnmounted(() => clearInterval(refreshTimer))
             </template>
           </div>
           <div class="hans-hero-tags">
-            <span class="hans-chip"><span class="dot" style="background:var(--leaf)"></span>air · monitored</span>
-            <span class="hans-chip"><span class="dot" style="background:var(--sky)"></span>humidity · tracked</span>
-            <span class="hans-chip hans-mono">{{ sparrows.length }} / {{ sparrows.length }} online</span>
+            <span v-if="housePressureTendency" class="hans-chip">
+              <span class="dot" :style="{ background: housePressureTendency.color }"></span>
+              pressure · {{ housePressureTendency.label }}
+            </span>
+            <span v-if="houseDewPoint !== null" class="hans-chip hans-mono">
+              <span class="dot" style="background:var(--sky)"></span>
+              dew · {{ houseDewPoint }}°
+            </span>
+            <span class="hans-chip hans-mono">{{ onlineCount }} / {{ sparrows.length }} online</span>
           </div>
         </div>
         <div class="hans-hero-meta">
@@ -279,8 +318,8 @@ onUnmounted(() => clearInterval(refreshTimer))
                   <span class="alias">sparrow-{{ String(i + 1).padStart(2, '0') }}</span>
                 </div>
                 <div class="sparrow-status">
-                  <span class="dot"></span>
-                  <span>online</span>
+                  <span class="dot" :style="{ background: isOnlineSparrow(s) ? 'var(--leaf)' : 'var(--clay)' }"></span>
+                  <span>{{ isOnlineSparrow(s) ? 'online' : 'offline' }}</span>
                 </div>
               </div>
               <div class="mini-metrics">

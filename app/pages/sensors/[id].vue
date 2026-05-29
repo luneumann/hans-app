@@ -40,7 +40,7 @@ const since = computed(() =>
   new Date(Date.now() - RANGE_HOURS[selectedRange.value] * 60 * 60 * 1000).toISOString()
 )
 
-const { data: rows, status } = await useAsyncData<Reading[]>(
+const { data: rows, status, refresh } = await useAsyncData<Reading[]>(
   `detail_${sparrowId.value}`,
   async () => {
     const { data, error } = await supabase
@@ -95,15 +95,143 @@ function minMax(metricId: string) {
   return { min: Math.min(...s), max: Math.max(...s) }
 }
 
+function relativeTime(date: Date): string {
+  const diffS = Math.floor((Date.now() - date.getTime()) / 1000)
+  if (diffS < 60) return `${diffS}s ago`
+  if (diffS < 3600) return `${Math.floor(diffS / 60)}m ago`
+  if (diffS < 86400) return `${Math.floor(diffS / 3600)}h ago`
+  return `${Math.floor(diffS / 86400)}d ago`
+}
+
 const lastSeen = computed(() => {
   const all = rows.value ?? []
   if (!all.length) return 'no data'
-  const latest = new Date(all[all.length - 1].recorded_at)
-  const diffS = Math.floor((Date.now() - latest.getTime()) / 1000)
-  if (diffS < 60) return `${diffS}s ago`
-  if (diffS < 3600) return `${Math.floor(diffS / 60)}m ago`
-  return `${Math.floor(diffS / 3600)}h ago`
+  return relativeTime(new Date(all[all.length - 1].recorded_at))
 })
+
+// Online: last reading within 11 min (5-min wake cycle + margin)
+const isOnline = computed(() => {
+  const all = rows.value ?? []
+  if (!all.length) return false
+  return (Date.now() - new Date(all[all.length - 1].recorded_at).getTime()) < 11 * 60 * 1000
+})
+
+// Data health: actual wake cycles vs expected for the window
+const dataHealth = computed(() => {
+  const hours = RANGE_HOURS[selectedRange.value]
+  const total = (rows.value ?? []).length
+  const actualCycles = Math.round(total / 3) // 3 metrics per wake cycle
+  const expectedCycles = hours * 12           // every 5 min = 12/hr
+  return {
+    actual: actualCycles,
+    expected: expectedCycles,
+    pct: Math.min(100, Math.round((actualCycles / Math.max(1, expectedCycles)) * 100)),
+  }
+})
+
+// Dew point via Magnus approximation
+const dewPoint = computed(() => {
+  const T = latestValue('temperature')
+  const RH = latestValue('humidity')
+  if (T === null || RH === null) return null
+  return +(T - (100 - RH) / 5).toFixed(1)
+})
+
+// How close is the current temperature to the dew point
+const condensationRisk = computed(() => {
+  const dp = dewPoint.value
+  const T = latestValue('temperature')
+  if (dp === null || T === null) return null
+  const gap = T - dp
+  if (gap < 3) return { label: 'High', color: 'var(--clay)' }
+  if (gap < 6) return { label: 'Moderate', color: 'var(--amber)' }
+  return { label: 'Low', color: 'var(--leaf)' }
+})
+
+// Pressure tendency: compare first 20% vs last 20% of window
+const pressureTendency = computed(() => {
+  const readings = byMetric.value.get('pressure') ?? []
+  if (readings.length < 6) return { label: 'stable', delta: 0, color: 'var(--ink-3)' }
+  const chunk = Math.max(3, Math.floor(readings.length * 0.2))
+  const recent  = readings.slice(-chunk).reduce((a, r) => a + r.value, 0) / chunk
+  const earlier = readings.slice(0, chunk).reduce((a, r) => a + r.value, 0) / chunk
+  const delta = +(recent - earlier).toFixed(1)
+  if (delta > 0.5) return { label: 'rising', delta, color: 'var(--leaf)' }
+  if (delta < -0.5) return { label: 'falling', delta, color: 'var(--clay)' }
+  return { label: 'stable', delta, color: 'var(--ink-3)' }
+})
+
+// Temperature stability: std dev over the window (lower = more stable)
+const tempStability = computed(() => {
+  const s = timeSeries('temperature')
+  if (s.length < 2) return null
+  const mean = s.reduce((a, b) => a + b, 0) / s.length
+  const variance = s.reduce((a, b) => a + (b - mean) ** 2, 0) / s.length
+  const sd = +Math.sqrt(variance).toFixed(2)
+  if (sd < 0.3) return { sd, label: 'very stable' }
+  if (sd < 0.8) return { sd, label: 'stable' }
+  if (sd < 1.5) return { sd, label: 'variable' }
+  return { sd, label: 'volatile' }
+})
+
+// Comfort score: distance from ideal 21°C / 50% RH
+const comfortScore = computed(() => {
+  const T = latestValue('temperature')
+  const RH = latestValue('humidity')
+  if (T === null || RH === null) return null
+  return Math.round(Math.max(0, Math.min(100,
+    100 - Math.abs(T - 21) * 4 - Math.abs(RH - 50) * 0.5
+  )))
+})
+
+// Real events derived from sensor data
+const recentEvents = computed(() => {
+  type Ev = { ts: number; when: string; text: string }
+  const events: Ev[] = []
+
+  const humReadings = byMetric.value.get('humidity') ?? []
+  for (let i = humReadings.length - 1; i > 0 && events.length < 2; i--) {
+    const prev = humReadings[i - 1].value
+    const curr = humReadings[i].value
+    const ts = new Date(humReadings[i].recorded_at).getTime()
+    if (prev < 60 && curr >= 60)
+      events.push({ ts, when: relativeTime(new Date(ts)), text: 'Humidity crossed 60% — ventilation recommended.' })
+    else if (prev >= 60 && curr < 60)
+      events.push({ ts, when: relativeTime(new Date(ts)), text: 'Humidity dropped back below 60%.' })
+  }
+
+  const tempVals = byMetric.value.get('temperature') ?? []
+  if (tempVals.length) {
+    const peak = tempVals.reduce((a, b) => a.value > b.value ? a : b)
+    const peakTs = new Date(peak.recorded_at).getTime()
+    events.push({ ts: peakTs, when: relativeTime(new Date(peakTs)), text: `Temperature peak: ${peak.value.toFixed(1)} °C.` })
+
+    const trough = tempVals.reduce((a, b) => a.value < b.value ? a : b)
+    if (trough.recorded_at !== peak.recorded_at) {
+      const troughTs = new Date(trough.recorded_at).getTime()
+      events.push({ ts: troughTs, when: relativeTime(new Date(troughTs)), text: `Temperature low: ${trough.value.toFixed(1)} °C.` })
+    }
+  }
+
+  // Signal gaps > 10 min (WiFi drops, brownouts)
+  for (let i = tempVals.length - 1; i > 0 && events.length < 5; i--) {
+    const gap = new Date(tempVals[i].recorded_at).getTime() - new Date(tempVals[i - 1].recorded_at).getTime()
+    if (gap > 10 * 60 * 1000) {
+      const ts = new Date(tempVals[i].recorded_at).getTime()
+      events.push({ ts, when: relativeTime(new Date(ts)), text: `Signal gap: ${Math.round(gap / 60000)} min without data.` })
+      break
+    }
+  }
+
+  return events.sort((a, b) => b.ts - a.ts).slice(0, 4)
+})
+
+// Auto-refresh every 5 seconds
+let refreshTimer: ReturnType<typeof setInterval>
+onMounted(() => {
+  refreshTimer = setInterval(refresh, 5000)
+})
+onUnmounted(() => clearInterval(refreshTimer))
 </script>
 
 <template>
@@ -124,16 +252,22 @@ const lastSeen = computed(() => {
         <div>
           <div class="hans-hero-greeting hans-mono">{{ sparrowId }}</div>
           <h1 class="hans-hero-title">{{ sparrowId }}</h1>
-          <div class="hans-hero-sub">A small radio in a quiet corner, breathing temperature, humidity, and pressure into the network every 30 seconds.</div>
+          <div class="hans-hero-sub">ESP8266 + BME280 — wakes every 5 minutes, posts temperature, humidity, and pressure, then sleeps again.</div>
           <div class="hans-hero-tags">
-            <span class="hans-chip"><span class="dot" style="background:var(--leaf)"></span>online</span>
+            <span class="hans-chip">
+              <span class="dot" :style="{ background: isOnline ? 'var(--leaf)' : 'var(--clay)' }"></span>
+              {{ isOnline ? 'online' : 'offline' }}
+            </span>
             <span class="hans-chip hans-mono">last beacon · {{ lastSeen }}</span>
-            <span class="hans-chip hans-mono">fw 0.4.1</span>
+            <span v-if="pressureTendency.label !== 'stable'" class="hans-chip hans-mono">
+              <span class="dot" :style="{ background: pressureTendency.color }"></span>
+              pressure · {{ pressureTendency.label }}
+            </span>
           </div>
         </div>
         <div class="hans-hero-meta">
-          <div class="hans-pill hans-mono">signal · -52 dBm</div>
-          <div class="hans-pill hans-mono">uptime · 14d 6h</div>
+          <div class="hans-pill hans-mono">data health · {{ dataHealth.pct }}%</div>
+          <div class="hans-pill hans-mono">{{ dataHealth.actual }} / {{ dataHealth.expected }} cycles</div>
         </div>
       </div>
     </div>
@@ -196,56 +330,98 @@ const lastSeen = computed(() => {
 
       <!-- SIDE PANEL -->
       <div class="hans-detail-side">
+
+        <!-- Device -->
         <div class="hans-card">
           <h3 class="panel-h">Device</h3>
           <div class="hans-kv">
-            <div class="k">ID</div><div class="v hans-mono">{{ sparrowId }}</div>
-            <div class="k">Firmware</div><div class="v hans-mono">0.4.1</div>
-            <div class="k">Hardware</div><div class="v hans-mono">rev. C</div>
-            <div class="k">Signal</div><div class="v hans-mono">-52 dBm</div>
-            <div class="k">Last seen</div><div class="v hans-mono">{{ lastSeen }}</div>
-            <div class="k">Readings</div><div class="v hans-mono">{{ (rows ?? []).length }}</div>
-          </div>
-          <div class="hans-battery">
-            <div class="bar"><div class="fill" style="width:82%"></div></div>
-            <div class="pct">82%</div>
-          </div>
-        </div>
-
-        <div class="hans-card" style="margin-top:16px">
-          <h3 class="panel-h">Recent events</h3>
-          <div style="display:grid;gap:10px;font-size:12px">
-            <div style="display:flex;gap:10px">
-              <span class="hans-mono" style="color:var(--ink-4);min-width:52px">just now</span>
-              <span style="color:var(--ink-2)">Beacon received, all metrics nominal.</span>
+            <div class="k">ID</div>
+            <div class="v hans-mono">{{ sparrowId }}</div>
+            <div class="k">Status</div>
+            <div class="v hans-mono" :style="{ color: isOnline ? 'var(--leaf)' : 'var(--clay)' }">
+              {{ isOnline ? 'online' : 'offline' }}
             </div>
-            <div style="display:flex;gap:10px">
-              <span class="hans-mono" style="color:var(--ink-4);min-width:52px">12m ago</span>
-              <span style="color:var(--ink-2)">Pressure delta -0.3 hPa over 15 min.</span>
-            </div>
-            <div style="display:flex;gap:10px">
-              <span class="hans-mono" style="color:var(--ink-4);min-width:52px">1h ago</span>
-              <span style="color:var(--ink-2)">Humidity crossed 60% — brief spike.</span>
-            </div>
+            <div class="k">Last seen</div>
+            <div class="v hans-mono">{{ lastSeen }}</div>
+            <div class="k">Readings</div>
+            <div class="v hans-mono">{{ (rows ?? []).length }}</div>
+            <div class="k">Data health</div>
+            <div class="v hans-mono">{{ dataHealth.pct }}%</div>
+            <div class="k">Cycles</div>
+            <div class="v hans-mono">{{ dataHealth.actual }} / {{ dataHealth.expected }}</div>
           </div>
         </div>
 
+        <!-- Dew point -->
         <div class="hans-card" style="margin-top:16px">
-          <h3 class="panel-h">Comfort score</h3>
-          <div style="display:flex;align-items:baseline;gap:8px">
-            <div class="hans-mono" style="font-size:36px;letter-spacing:-0.04em">
-              {{ latestValue('temperature') !== null && latestValue('humidity') !== null
-                  ? Math.round(Math.max(0, Math.min(100,
-                      100
-                      - Math.abs((latestValue('temperature') ?? 22) - 21) * 4
-                      - Math.abs((latestValue('humidity') ?? 50) - 50) * 0.5
-                    )))
-                  : '—' }}
+          <h3 class="panel-h">Dew point</h3>
+          <div style="display:flex;align-items:baseline;gap:8px;margin-bottom:6px">
+            <div class="hans-mono" style="font-size:32px;letter-spacing:-0.04em">
+              {{ dewPoint !== null ? `${dewPoint}°` : '—' }}
             </div>
-            <div style="color:var(--ink-3);font-size:12px">/ 100</div>
+            <div style="color:var(--ink-3);font-size:12px">C</div>
           </div>
-          <div style="color:var(--ink-3);font-size:12px;margin-top:6px">Based on temperature and humidity comfort ranges.</div>
+          <div v-if="condensationRisk" style="display:flex;align-items:center;gap:6px;font-size:12px">
+            <span class="dot" :style="{ background: condensationRisk.color }"></span>
+            <span style="color:var(--ink-2)">Condensation risk: <strong>{{ condensationRisk.label }}</strong></span>
+          </div>
+          <div style="color:var(--ink-4);font-size:11px;margin-top:6px">
+            {{ dewPoint !== null && latestValue('temperature') !== null
+              ? `${(latestValue('temperature')! - dewPoint).toFixed(1)}° margin to surface condensation`
+              : 'Calculated from temperature and humidity.' }}
+          </div>
         </div>
+
+        <!-- Pressure tendency -->
+        <div class="hans-card" style="margin-top:16px">
+          <h3 class="panel-h">Pressure tendency</h3>
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+            <span class="dot" :style="{ background: pressureTendency.color }"></span>
+            <span class="hans-mono" style="font-size:18px;letter-spacing:-0.02em">{{ pressureTendency.label }}</span>
+          </div>
+          <div style="color:var(--ink-3);font-size:12px">
+            <template v-if="pressureTendency.delta !== 0">
+              {{ pressureTendency.delta > 0 ? '+' : '' }}{{ pressureTendency.delta }} hPa over {{ selectedRange }}
+            </template>
+            <template v-else>
+              No significant pressure change over {{ selectedRange }}.
+            </template>
+          </div>
+          <div style="color:var(--ink-4);font-size:11px;margin-top:4px">
+            {{ pressureTendency.label === 'rising' ? 'Improving weather likely.' : pressureTendency.label === 'falling' ? 'Weather change possible.' : 'Conditions stable.' }}
+          </div>
+        </div>
+
+        <!-- Stability + Comfort -->
+        <div class="hans-card" style="margin-top:16px">
+          <h3 class="panel-h">Environment</h3>
+          <div class="hans-kv">
+            <div class="k">Comfort</div>
+            <div class="v hans-mono">{{ comfortScore !== null ? `${comfortScore} / 100` : '—' }}</div>
+            <div class="k">Stability</div>
+            <div class="v hans-mono">{{ tempStability ? tempStability.label : '—' }}</div>
+            <div class="k">Temp σ</div>
+            <div class="v hans-mono">{{ tempStability ? `±${tempStability.sd} °C` : '—' }}</div>
+          </div>
+          <div style="color:var(--ink-4);font-size:11px;margin-top:8px">
+            Comfort targets 21 °C / 50 % RH. Stability is σ of temperature over {{ selectedRange }}.
+          </div>
+        </div>
+
+        <!-- Events -->
+        <div class="hans-card" style="margin-top:16px">
+          <h3 class="panel-h">Events · {{ selectedRange }}</h3>
+          <div v-if="recentEvents.length" style="display:grid;gap:10px;font-size:12px">
+            <div v-for="ev in recentEvents" :key="ev.ts" style="display:flex;gap:10px">
+              <span class="hans-mono" style="color:var(--ink-4);min-width:56px;flex-shrink:0">{{ ev.when }}</span>
+              <span style="color:var(--ink-2)">{{ ev.text }}</span>
+            </div>
+          </div>
+          <div v-else style="color:var(--ink-4);font-size:12px">
+            No notable events in this window.
+          </div>
+        </div>
+
       </div>
     </div>
 
