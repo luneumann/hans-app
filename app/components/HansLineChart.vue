@@ -10,7 +10,7 @@
       <line
         :x1="padL" :x2="W - padR"
         :y1="yFor(v)" :y2="yFor(v)"
-        stroke="oklch(0.34 0.04 168)"
+        stroke="var(--line)"
         stroke-width="1"
         :stroke-dasharray="i === 0 ? '0' : '2 4'"
         :opacity="i === 0 ? 0.7 : 0.45"
@@ -18,7 +18,7 @@
       <text
         :x="padL - 8" :y="yFor(v) + 3"
         text-anchor="end" font-size="10"
-        fill="oklch(0.62 0.015 170)"
+        fill="var(--ink-3)"
         font-family="Geist Mono, monospace"
       >{{ decimals === 0 ? Math.round(v) : v.toFixed(decimals) }}</text>
     </g>
@@ -29,7 +29,7 @@
       :x="padL + (i / (xLabels.length - 1)) * (W - padL - padR)"
       :y="H - 6"
       text-anchor="middle" font-size="10"
-      fill="oklch(0.58 0.018 170)"
+      fill="var(--ink-4)"
       font-family="Geist Mono, monospace"
     >{{ lab }}</text>
 

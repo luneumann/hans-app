@@ -221,23 +221,10 @@ const coolestRoom = computed(() => {
   return best
 })
 
-// Aurora: drive hue from house temperature.
-// Cool (15°C) → pastel sky 220, mild (21°C) → mint 155, warm (28°C) → pastel rose 12.
-const auroraHue = computed(() => {
-  const T = houseAvg('temperature')
-  if (T === null) return 155
-  const clamped = Math.max(15, Math.min(28, T))
-  if (clamped <= 21) {
-    const t = (clamped - 15) / 6
-    return Math.round(220 - t * 65) // 220 → 155
-  } else {
-    const t = (clamped - 21) / 7
-    // 155 → 12 (passes briefly through warm pastel hues — looks great soft-blended)
-    return Math.round(155 - t * 143)
-  }
-})
-// Secondary hue offset for the second aurora lobe (sister color)
-const auroraHue2 = computed(() => (Math.round(auroraHue.value + 50) + 360) % 360)
+// Aurora hue is interpolated from the theme's auroraStops by temperature.
+const theme = useTheme()
+const auroraHue = computed(() => auroraHueFor(houseAvg('temperature'), theme.value))
+const auroraHue2 = computed(() => (auroraHue.value + 50 + 360) % 360)
 
 // Mascot vitality: comfort score of house
 const mascotVitality = computed(() => {

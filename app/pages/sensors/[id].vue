@@ -249,15 +249,10 @@ const recentEvents = computed(() => {
   return events.sort((a, b) => b.ts - a.ts).slice(0, 4)
 })
 
-// Aurora hue from sparrow's current temperature (pastel sky → mint → rose)
-const auroraHue = computed(() => {
-  const T = latestValue('temperature')
-  if (T === null) return 155
-  const clamped = Math.max(15, Math.min(28, T))
-  if (clamped <= 21) return Math.round(220 - ((clamped - 15) / 6) * 65)
-  return Math.round(155 - ((clamped - 21) / 7) * 143)
-})
-const auroraHue2 = computed(() => (Math.round(auroraHue.value + 50) + 360) % 360)
+// Aurora hue is interpolated from the theme's auroraStops by sparrow temperature.
+const theme = useTheme()
+const auroraHue = computed(() => auroraHueFor(latestValue('temperature'), theme.value))
+const auroraHue2 = computed(() => (auroraHue.value + 50 + 360) % 360)
 
 // Last-hour temperature cycle timestamps for pulse strip
 const cycleTimestamps = computed(() => {

@@ -10,9 +10,9 @@
       <nav class="hans-nav">
         <NuxtLink to="/" class="hans-nav-brand">
           <div class="logo">
-            <svg viewBox="0 0 24 24" fill="none" stroke="oklch(0.76 0.18 155)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <svg viewBox="0 0 24 24" fill="none" stroke="var(--leaf)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
               <path d="M5 18V8M5 13h7M12 18V8"/>
-              <circle cx="18" cy="8" r="2" fill="oklch(0.82 0.14 12)" stroke="none"/>
+              <circle cx="18" cy="8" r="2" fill="var(--rose)" stroke="none"/>
             </svg>
           </div>
           <div>

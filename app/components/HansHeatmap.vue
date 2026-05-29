@@ -21,7 +21,7 @@
       </div>
       <div class="hans-heatmap-legend">
         <span class="lbl">low</span>
-        <span class="grad"></span>
+        <span class="grad" :style="{ background: legendGradient }"></span>
         <span class="lbl">high</span>
         <span class="meta">comfort score</span>
       </div>
@@ -42,6 +42,9 @@ const props = defineProps<{
   days?: number
 }>()
 
+const theme = useTheme()
+const legendGradient = computed(() => comfortGradientCss(theme.value))
+
 const DAYS = computed(() => props.days ?? 7)
 
 const dayLabels = computed(() => {
@@ -53,16 +56,6 @@ const dayLabels = computed(() => {
   }
   return labels
 })
-
-function comfortColor(score: number | null): string {
-  if (score === null) return 'color-mix(in oklab, var(--ink-4) 14%, transparent)'
-  // Low = soft pastel rose (12), high = mint emerald (155). Pretty across the spectrum.
-  const t = score / 100
-  const hue = 12 + t * 143         // 12 → 155
-  const chroma = 0.06 + t * 0.12
-  const alpha = 0.40 + t * 0.50
-  return `oklch(0.74 ${chroma} ${hue} / ${alpha})`
-}
 
 const cells = computed(() => {
   // Bucket readings: day (0..DAYS-1, 0 = oldest) × hour (0..23) → { temp[], hum[] }
@@ -98,7 +91,7 @@ const cells = computed(() => {
       }
       out.push({
         key: `${d}-${h}`,
-        color: comfortColor(score),
+        color: comfortColor(score, theme.value),
         title: score !== null
           ? `${dayLabels.value[d]} ${String(h).padStart(2, '0')}:00 — comfort ${score}`
           : `${dayLabels.value[d]} ${String(h).padStart(2, '0')}:00 — no data`,
@@ -184,8 +177,8 @@ const cells = computed(() => {
   width: 60px;
   height: 8px;
   border-radius: 2px;
-  background: linear-gradient(90deg, oklch(0.74 0.12 12 / 0.45), oklch(0.78 0.10 85 / 0.55), oklch(0.78 0.18 155 / 0.9));
   border: 1px solid var(--line-soft);
+  /* background set inline from comfortGradientCss(theme) */
 }
 .hans-heatmap-legend .meta { margin-left: 12px; font-family: 'Geist Mono', monospace; }
 </style>

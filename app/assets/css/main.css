@@ -7,40 +7,13 @@
    ================================================================ */
 
 :root {
-  /* Forest-night base — deep clean green, no olive */
-  --bg:        oklch(0.158 0.03 168);
-  --bg-soft:   oklch(0.20 0.035 168);
-  --panel:     oklch(0.228 0.038 168);
-  --panel-2:   oklch(0.258 0.04 168);
-  --line:      oklch(0.34 0.04 168);
-  --line-soft: oklch(0.29 0.035 168);
+  /* Color tokens (--bg, --leaf, --rose, …) are injected by the theme plugin
+     (app/plugins/theme.ts) from app/composables/useTheme.ts.
+     Edit colors there — not here. */
 
-  /* Cool neutral inks — no warm/yellow undertones */
-  --ink:   oklch(0.96 0.008 170);
-  --ink-2: oklch(0.80 0.012 170);
-  --ink-3: oklch(0.62 0.015 170);
-  --ink-4: oklch(0.46 0.018 170);
-
-  /* Primary: vibrant clean emerald-mint */
-  --leaf:      oklch(0.76 0.18 155);
-  --leaf-soft: oklch(0.76 0.18 155 / 0.20);
-
-  /* Complementary pastel rose — the new signature accent */
-  --rose:      oklch(0.82 0.14 12);
-  --rose-soft: oklch(0.82 0.14 12 / 0.20);
-
-  /* Pastel palette — legacy names remapped to fresh tones */
-  --amber:     oklch(0.86 0.10 50);
-  --amber-soft:oklch(0.86 0.10 50 / 0.20);
-  --sky:       oklch(0.82 0.10 220);
-  --sky-soft:  oklch(0.82 0.10 220 / 0.20);
-  --clay:      oklch(0.82 0.14 12);          /* now pastel rose, no more brown */
-  --clay-soft: oklch(0.82 0.14 12 / 0.20);
-  --plum:      oklch(0.80 0.13 295);         /* now pastel lavender */
-  --plum-soft: oklch(0.80 0.13 295 / 0.20);
-
-  --shadow-soft: 0 1px 0 oklch(1 0 0 / 0.03) inset, 0 1px 2px oklch(0 0 0 / 0.3);
-  --shadow-card: 0 1px 0 oklch(1 0 0 / 0.04) inset, 0 6px 24px oklch(0 0 0 / 0.35);
+  --shadow-soft: 0 1px 0 oklch(1 0 0 / 0.04) inset, 0 1px 2px oklch(0 0 0 / 0.3);
+  --shadow-card: 0 1px 0 oklch(1 0 0 / 0.05) inset, 0 6px 24px oklch(0 0 0 / 0.35);
+  --shadow-glow: 0 0 24px color-mix(in oklab, var(--leaf) 20%, transparent);
 
   --r-xs: 6px;
   --r-sm: 10px;
