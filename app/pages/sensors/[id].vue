@@ -55,6 +55,29 @@ const { data: rows, status, refresh } = await useAsyncData<Reading[]>(
   { watch: [since, sparrowId] }
 )
 
+// Yesterday-at-this-time window (±15 min)
+const yStart = computed(() => new Date(Date.now() - 24 * 60 * 60 * 1000 - 15 * 60 * 1000).toISOString())
+const yEnd   = computed(() => new Date(Date.now() - 24 * 60 * 60 * 1000 + 15 * 60 * 1000).toISOString())
+const { data: yRows, refresh: refreshY } = await useAsyncData<Reading[]>(
+  `detail_y_${sparrowId.value}`,
+  async () => {
+    const { data, error } = await supabase
+      .from('sensor_readings')
+      .select('sparrow_id, metric, value, recorded_at')
+      .eq('sparrow_id', sparrowId.value)
+      .gte('recorded_at', yStart.value)
+      .lte('recorded_at', yEnd.value)
+    if (error) throw error
+    return (data ?? []) as Reading[]
+  },
+  { watch: [sparrowId] }
+)
+function yesterdayValue(metricId: string): number | null {
+  const vals = (yRows.value ?? []).filter(r => r.metric === metricId).map(r => r.value)
+  if (!vals.length) return null
+  return vals.reduce((a, b) => a + b, 0) / vals.length
+}
+
 const byMetric = computed(() => {
   const map = new Map<string, Reading[]>()
   for (const r of rows.value ?? []) {
@@ -226,10 +249,30 @@ const recentEvents = computed(() => {
   return events.sort((a, b) => b.ts - a.ts).slice(0, 4)
 })
 
+// Aurora hue from sparrow's current temperature
+const auroraHue = computed(() => {
+  const T = latestValue('temperature')
+  if (T === null) return 130
+  const clamped = Math.max(15, Math.min(28, T))
+  if (clamped <= 21) return Math.round(220 - ((clamped - 15) / 6) * 90)
+  return Math.round(130 - ((clamped - 21) / 7) * 80)
+})
+const auroraHue2 = computed(() => Math.round(auroraHue.value + 40) % 360)
+
+// Last-hour temperature cycle timestamps for pulse strip
+const cycleTimestamps = computed(() => {
+  const tempReadings = byMetric.value.get('temperature') ?? []
+  const cutoff = Date.now() - 60 * 60 * 1000
+  return tempReadings.filter(r => new Date(r.recorded_at).getTime() >= cutoff).map(r => r.recorded_at)
+})
+
 // Auto-refresh every 5 seconds
 let refreshTimer: ReturnType<typeof setInterval>
 onMounted(() => {
-  refreshTimer = setInterval(refresh, 5000)
+  refreshTimer = setInterval(() => {
+    refresh()
+    refreshY()
+  }, 5000)
 })
 onUnmounted(() => clearInterval(refreshTimer))
 </script>
@@ -248,6 +291,7 @@ onUnmounted(() => clearInterval(refreshTimer))
     <!-- HERO -->
     <div class="hans-hero">
       <div class="hans-hero-img" :style="{ backgroundImage: `url(${sparrowImage(sparrowId)})` }"></div>
+      <div class="hans-aurora" :style="{ '--aurora-hue': auroraHue, '--aurora-hue-2': auroraHue2 }"></div>
       <div class="hans-hero-content">
         <div>
           <div class="hans-hero-greeting hans-mono">{{ sparrowId }}</div>
@@ -294,6 +338,7 @@ onUnmounted(() => clearInterval(refreshTimer))
             :value="latestValue(m.id) ?? 0"
             :trend="trend(m.id)"
             :spark-data="timeSeries(m.id)"
+            :yesterday-value="yesterdayValue(m.id)"
             :label="`${sparrowId}`"
             :range-label="`last ${selectedRange}`"
           />
@@ -349,6 +394,13 @@ onUnmounted(() => clearInterval(refreshTimer))
             <div class="v hans-mono">{{ dataHealth.pct }}%</div>
             <div class="k">Cycles</div>
             <div class="v hans-mono">{{ dataHealth.actual }} / {{ dataHealth.expected }}</div>
+          </div>
+          <div style="margin-top:16px;padding-top:14px;border-top:1px solid var(--line-soft)">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+              <span style="font-size:10px;letter-spacing:0.14em;text-transform:uppercase;color:var(--ink-4)">Last hour</span>
+              <span style="font-family:'Geist Mono',monospace;font-size:10px;color:var(--ink-4)">5 min cycles</span>
+            </div>
+            <HansCyclePulse :timestamps="cycleTimestamps" :cycles="12"/>
           </div>
         </div>
 

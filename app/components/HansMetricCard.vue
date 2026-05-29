@@ -14,8 +14,17 @@
     </div>
 
     <div class="hans-metric-value">
-      <span>{{ formattedValue }}</span>
+      <AnimatedNumber :value="value" :decimals="metric.decimals"/>
       <span class="unit">{{ metric.unit }}</span>
+    </div>
+
+    <div v-if="yesterdayValue !== null && yesterdayValue !== undefined" class="hans-metric-y">
+      <span class="lbl">vs yesterday</span>
+      <span class="hans-mono">{{ formatVal(yesterdayValue) }}{{ metric.unit }}</span>
+      <span :class="['delta', deltaClass]">
+        <component :is="deltaIcon"/>
+        {{ deltaStr }}{{ metric.unit }}
+      </span>
     </div>
 
     <div class="hans-metric-foot">
@@ -53,6 +62,9 @@ const icons = {
   down: () => h('svg', { viewBox: '0 0 12 12', fill: 'none', stroke: 'currentColor', 'stroke-width': '2', 'stroke-linecap': 'round', 'stroke-linejoin': 'round' }, [
     h('path', { d: 'M3 4l3 3 3-3' }),
   ]),
+  flat: () => h('svg', { viewBox: '0 0 12 12', fill: 'none', stroke: 'currentColor', 'stroke-width': '2', 'stroke-linecap': 'round' }, [
+    h('path', { d: 'M3 6h6' }),
+  ]),
 }
 
 const props = defineProps<{
@@ -62,6 +74,7 @@ const props = defineProps<{
   sparkData: number[]
   label?: string
   rangeLabel?: string
+  yesterdayValue?: number | null
 }>()
 
 const trendUp = computed(() => props.trend >= 0)
@@ -69,7 +82,30 @@ const trendAbs = computed(() => Math.abs(props.trend))
 const trendStr = computed(() =>
   props.metric.decimals === 0 ? Math.round(trendAbs.value).toString() : trendAbs.value.toFixed(1)
 )
-const formattedValue = computed(() =>
-  props.metric.decimals === 0 ? Math.round(props.value).toString() : props.value.toFixed(props.metric.decimals)
-)
+
+function formatVal(v: number) {
+  return props.metric.decimals === 0 ? Math.round(v).toString() : v.toFixed(props.metric.decimals)
+}
+
+const yesterdayDelta = computed(() => {
+  if (props.yesterdayValue === null || props.yesterdayValue === undefined) return 0
+  return props.value - props.yesterdayValue
+})
+const deltaClass = computed(() => {
+  const epsilon = props.metric.decimals === 0 ? 0.5 : 0.1
+  if (yesterdayDelta.value > epsilon) return 'up'
+  if (yesterdayDelta.value < -epsilon) return 'down'
+  return 'flat'
+})
+const deltaIcon = computed(() => {
+  if (deltaClass.value === 'up') return icons.up
+  if (deltaClass.value === 'down') return icons.down
+  return icons.flat
+})
+const deltaStr = computed(() => {
+  const d = yesterdayDelta.value
+  const sign = d > 0 ? '+' : d < 0 ? '−' : '±'
+  const v = Math.abs(d)
+  return `${sign}${props.metric.decimals === 0 ? Math.round(v) : v.toFixed(1)}`
+})
 </script>

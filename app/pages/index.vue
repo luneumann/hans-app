@@ -50,12 +50,41 @@ const { data: rows, status, refresh } = await useAsyncData<Reading[]>(
   { watch: [since] }
 )
 
-// Derived data
+// Yesterday window: ±15 min around (now − 24h)
+const yesterdayStart = computed(() => new Date(Date.now() - 24 * 60 * 60 * 1000 - 15 * 60 * 1000).toISOString())
+const yesterdayEnd   = computed(() => new Date(Date.now() - 24 * 60 * 60 * 1000 + 15 * 60 * 1000).toISOString())
+
+const { data: yRows, refresh: refreshYesterday } = await useAsyncData<Reading[]>(
+  'yesterday_readings',
+  async () => {
+    const { data, error } = await supabase
+      .from('sensor_readings')
+      .select('sparrow_id, metric, value, recorded_at')
+      .gte('recorded_at', yesterdayStart.value)
+      .lte('recorded_at', yesterdayEnd.value)
+    if (error) throw error
+    return (data ?? []) as Reading[]
+  }
+)
+
+// 7d data for heatmap (independent of selectedRange)
+const heatmapSince = computed(() => new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString())
+const { data: weekRows, refresh: refreshWeek } = await useAsyncData<Reading[]>(
+  'week_readings',
+  async () => {
+    const { data, error } = await supabase
+      .from('sensor_readings')
+      .select('sparrow_id, metric, value, recorded_at')
+      .gte('recorded_at', heatmapSince.value)
+    if (error) throw error
+    return (data ?? []) as Reading[]
+  }
+)
+
 const sparrows = computed(() =>
   [...new Set((rows.value ?? []).map(r => r.sparrow_id))].sort()
 )
 
-// Group readings by sparrow → metric → sorted readings
 const byGroup = computed(() => {
   const map = new Map<string, Map<string, Reading[]>>()
   for (const r of rows.value ?? []) {
@@ -68,14 +97,12 @@ const byGroup = computed(() => {
   return map
 })
 
-// Latest value per sparrow per metric
 function latestValue(sparrowId: string, metricId: string): number | null {
   const readings = byGroup.value.get(sparrowId)?.get(metricId)
   if (!readings?.length) return null
   return readings[readings.length - 1].value
 }
 
-// House average for a metric
 function houseAvg(metricId: string): number | null {
   const vals = sparrows.value
     .map(s => latestValue(s, metricId))
@@ -84,18 +111,21 @@ function houseAvg(metricId: string): number | null {
   return vals.reduce((a, b) => a + b, 0) / vals.length
 }
 
-// Evenly-sampled series for sparkline/chart (returns last N values)
+function yesterdayAvg(metricId: string): number | null {
+  const vals = (yRows.value ?? []).filter(r => r.metric === metricId).map(r => r.value)
+  if (!vals.length) return null
+  return vals.reduce((a, b) => a + b, 0) / vals.length
+}
+
 function timeSeries(sparrowId: string, metricId: string, points = 60): number[] {
   const readings = byGroup.value.get(sparrowId)?.get(metricId) ?? []
   if (!readings.length) return []
-  // Sample evenly
   const step = Math.max(1, Math.floor(readings.length / points))
   const sampled: number[] = []
   for (let i = 0; i < readings.length; i += step) sampled.push(readings[i].value)
   return sampled
 }
 
-// Aggregate sparkline (mean across sparrows)
 function aggSeries(metricId: string): number[] {
   const series = sparrows.value.map(s => timeSeries(s, metricId))
   const len = Math.max(...series.map(s => s.length), 0)
@@ -106,7 +136,6 @@ function aggSeries(metricId: string): number[] {
   })
 }
 
-// Multi-sparrow series for multi-line charts
 function sparrowSeries(metricId: string): Record<string, number[]> {
   const out: Record<string, number[]> = {}
   for (const id of sparrows.value) {
@@ -119,7 +148,7 @@ function sparrowSeries(metricId: string): Record<string, number[]> {
 const SPARROW_COLORS = ['var(--leaf)', 'var(--amber)', 'var(--clay)', 'var(--sky)', 'var(--plum)']
 function sparrowColor(idx: number) { return SPARROW_COLORS[idx % SPARROW_COLORS.length] }
 
-// Online: last temperature reading within 11 min (5-min cycle + margin)
+// Online: last temperature reading < 11 min ago
 function isOnlineSparrow(id: string): boolean {
   const readings = byGroup.value.get(id)?.get('temperature') ?? []
   if (!readings.length) return false
@@ -127,32 +156,13 @@ function isOnlineSparrow(id: string): boolean {
 }
 const onlineCount = computed(() => sparrows.value.filter(isOnlineSparrow).length)
 
-// Dew point (Magnus approximation) for house average
-const houseDewPoint = computed(() => {
-  const T = houseAvg('temperature')
-  const RH = houseAvg('humidity')
-  if (T === null || RH === null) return null
-  return +(T - (100 - RH) / 5).toFixed(1)
-})
+// Sparrow's cycle timestamps for pulse strip (1h window of temperature readings)
+function sparrowCycleTimestamps(id: string): string[] {
+  const readings = byGroup.value.get(id)?.get('temperature') ?? []
+  const cutoff = Date.now() - 60 * 60 * 1000
+  return readings.filter(r => new Date(r.recorded_at).getTime() >= cutoff).map(r => r.recorded_at)
+}
 
-// Pressure tendency across all sparrows combined
-const housePressureTendency = computed(() => {
-  const all: Reading[] = []
-  for (const id of sparrows.value) {
-    all.push(...(byGroup.value.get(id)?.get('pressure') ?? []))
-  }
-  all.sort((a, b) => a.recorded_at.localeCompare(b.recorded_at))
-  if (all.length < 6) return null
-  const chunk = Math.max(3, Math.floor(all.length * 0.2))
-  const recent  = all.slice(-chunk).reduce((a, r) => a + r.value, 0) / chunk
-  const earlier = all.slice(0, chunk).reduce((a, r) => a + r.value, 0) / chunk
-  const delta = +(recent - earlier).toFixed(1)
-  if (delta > 0.5) return { label: 'rising', color: 'var(--leaf)' }
-  if (delta < -0.5) return { label: 'falling', color: 'var(--clay)' }
-  return null // stable = no chip, nothing to say
-})
-
-// Trend: difference between last 20% and previous 20% of readings
 function trend(sparrowId: string, metricId: string): number {
   const readings = byGroup.value.get(sparrowId)?.get(metricId) ?? []
   if (readings.length < 4) return 0
@@ -166,6 +176,93 @@ function avgTrend(metricId: string): number {
   return vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : 0
 }
 
+// Dew point (Magnus) house-wide
+const houseDewPoint = computed(() => {
+  const T = houseAvg('temperature')
+  const RH = houseAvg('humidity')
+  if (T === null || RH === null) return null
+  return +(T - (100 - RH) / 5).toFixed(1)
+})
+
+// House pressure tendency
+const housePressureDelta = computed(() => {
+  const all: Reading[] = []
+  for (const id of sparrows.value) all.push(...(byGroup.value.get(id)?.get('pressure') ?? []))
+  all.sort((a, b) => a.recorded_at.localeCompare(b.recorded_at))
+  if (all.length < 6) return 0
+  const chunk = Math.max(3, Math.floor(all.length * 0.2))
+  const recent  = all.slice(-chunk).reduce((a, r) => a + r.value, 0) / chunk
+  const earlier = all.slice(0, chunk).reduce((a, r) => a + r.value, 0) / chunk
+  return +(recent - earlier).toFixed(1)
+})
+const housePressureTendency = computed(() => {
+  if (housePressureDelta.value > 0.5) return { label: 'rising', color: 'var(--leaf)' }
+  if (housePressureDelta.value < -0.5) return { label: 'falling', color: 'var(--clay)' }
+  return null
+})
+
+// Warmest / coolest room (right now)
+const warmestRoom = computed(() => {
+  let best: { name: string; value: number } | null = null
+  for (const s of sparrows.value) {
+    const v = latestValue(s, 'temperature')
+    if (v === null) continue
+    if (!best || v > best.value) best = { name: s, value: v }
+  }
+  return best
+})
+const coolestRoom = computed(() => {
+  let best: { name: string; value: number } | null = null
+  for (const s of sparrows.value) {
+    const v = latestValue(s, 'temperature')
+    if (v === null) continue
+    if (!best || v < best.value) best = { name: s, value: v }
+  }
+  return best
+})
+
+// Aurora: drive hue from house temperature.
+// 16°C → 220 (sky-blue), 21°C → 130 (leaf-green), 26°C → 50 (amber)
+const auroraHue = computed(() => {
+  const T = houseAvg('temperature')
+  if (T === null) return 130
+  const clamped = Math.max(15, Math.min(28, T))
+  // linear interp
+  if (clamped <= 21) {
+    const t = (clamped - 15) / 6
+    return Math.round(220 - t * 90) // 220 → 130
+  } else {
+    const t = (clamped - 21) / 7
+    return Math.round(130 - t * 80) // 130 → 50
+  }
+})
+const auroraHue2 = computed(() => Math.round(auroraHue.value + 40) % 360)
+
+// Mascot vitality: comfort score of house
+const mascotVitality = computed(() => {
+  const T = houseAvg('temperature')
+  const RH = houseAvg('humidity')
+  if (T === null || RH === null) return 50
+  return Math.round(Math.max(0, Math.min(100,
+    100 - Math.abs(T - 21) * 4 - Math.abs(RH - 50) * 0.5
+  )))
+})
+const mascotMood = computed(() => {
+  const v = mascotVitality.value
+  if (v < 35) return 'Resting'
+  if (v < 65) return 'Watching'
+  if (v < 85) return 'Content'
+  return 'Thriving'
+})
+const mascotDetail = computed(() => {
+  const v = mascotVitality.value
+  const RH = houseAvg('humidity')
+  if (v < 35) return 'Conditions are off — Hans is hibernating until the air balances.'
+  if (v < 65) return 'Hans is keeping watch over the house.'
+  if (v < 85) return `Air is balanced. ${RH !== null ? `Humidity at ${Math.round(RH)}% feels just right.` : ''}`
+  return 'Hans is glowing — these are ideal conditions.'
+})
+
 // Hero text
 const heroTemp = computed(() => houseAvg('temperature'))
 const heroHum  = computed(() => houseAvg('humidity'))
@@ -177,13 +274,20 @@ const timeStr = computed(() => now.value.toLocaleTimeString('de-DE', { hour: '2-
 
 // Auto-refresh every 5 seconds
 let refreshTimer: ReturnType<typeof setInterval>
+let weekTimer: ReturnType<typeof setInterval>
 onMounted(() => {
   refreshTimer = setInterval(() => {
     now.value = new Date()
     refresh()
+    refreshYesterday()
   }, 5000)
+  // Heatmap data once per minute is plenty
+  weekTimer = setInterval(refreshWeek, 60000)
 })
-onUnmounted(() => clearInterval(refreshTimer))
+onUnmounted(() => {
+  clearInterval(refreshTimer)
+  clearInterval(weekTimer)
+})
 </script>
 
 <template>
@@ -192,12 +296,14 @@ onUnmounted(() => clearInterval(refreshTimer))
     <!-- HERO -->
     <div class="hans-hero">
       <div class="hans-hero-img" style="background-image: url('/sparrows/living-day.png')"></div>
+      <div class="hans-aurora" :style="{ '--aurora-hue': auroraHue, '--aurora-hue-2': auroraHue2 }"></div>
       <div class="hans-hero-content">
         <div>
           <div class="hans-hero-greeting">{{ greeting }} — {{ timeStr }} local</div>
           <h1 class="hans-hero-title">
             <template v-if="heroTemp !== null && heroHum !== null">
-              The house feels <em>{{ heroTemp.toFixed(1) }}°</em> and <em>{{ Math.round(heroHum!) }}%</em>.
+              The house feels <em><AnimatedNumber :value="heroTemp" :decimals="1"/>°</em>
+              and <em><AnimatedNumber :value="heroHum" :decimals="0"/>%</em>.
             </template>
             <template v-else>
               HANS is listening.
@@ -212,6 +318,10 @@ onUnmounted(() => clearInterval(refreshTimer))
             </template>
           </div>
           <div class="hans-hero-tags">
+            <span class="hans-chip hans-beacon">
+              <span class="core"></span>
+              <span class="hans-mono">live · auto-refresh 5s</span>
+            </span>
             <span v-if="housePressureTendency" class="hans-chip">
               <span class="dot" :style="{ background: housePressureTendency.color }"></span>
               pressure · {{ housePressureTendency.label }}
@@ -239,6 +349,38 @@ onUnmounted(() => clearInterval(refreshTimer))
 
     <template v-else>
 
+      <!-- NARRATIVE + MASCOT -->
+      <div class="hans-narrative-row" style="display:grid;grid-template-columns:1fr 320px;gap:16px;align-items:stretch;margin-bottom:8px">
+        <div class="hans-card">
+          <h3 style="font-size:11px;letter-spacing:0.16em;text-transform:uppercase;color:var(--ink-3);margin:0 0 12px;font-weight:500">House dispatch</h3>
+          <HansNarrative
+            :temp="heroTemp"
+            :humidity="heroHum"
+            :pressure="houseAvg('pressure')"
+            :dew-point="houseDewPoint"
+            :pressure-delta="housePressureDelta"
+            :warmest-room="warmestRoom"
+            :coolest-room="coolestRoom"
+            :online-count="onlineCount"
+            :total-count="sparrows.length"
+          />
+        </div>
+        <div class="hans-card hans-mascot-panel">
+          <div class="mascot-wrap">
+            <HansMascot
+              :size="110"
+              :vitality="mascotVitality"
+              :humidity="heroHum ?? 50"
+            />
+          </div>
+          <div class="info">
+            <div class="mood-label">Hans is</div>
+            <div class="mood">{{ mascotMood }}</div>
+            <div class="mood-detail">{{ mascotDetail }}</div>
+          </div>
+        </div>
+      </div>
+
       <!-- METRICS -->
       <div class="hans-section-head">
         <h2>Current ambient · house average</h2>
@@ -252,6 +394,7 @@ onUnmounted(() => clearInterval(refreshTimer))
           :value="houseAvg(m.id) ?? 0"
           :trend="avgTrend(m.id)"
           :spark-data="aggSeries(m.id)"
+          :yesterday-value="yesterdayAvg(m.id)"
           label="avg · all sparrows"
           :range-label="`last ${selectedRange}`"
         />
@@ -297,6 +440,15 @@ onUnmounted(() => clearInterval(refreshTimer))
         </div>
       </div>
 
+      <!-- 7d COMFORT RHYTHM -->
+      <div class="hans-section-head">
+        <h2>Rhythm · last 7 days</h2>
+        <span class="meta">hourly comfort score</span>
+      </div>
+      <div class="hans-card">
+        <HansHeatmap :readings="weekRows ?? []" :days="7"/>
+      </div>
+
       <!-- SPARROWS -->
       <div class="hans-section-head">
         <h2>Sparrows</h2>
@@ -330,6 +482,10 @@ onUnmounted(() => clearInterval(refreshTimer))
                   </span>
                 </div>
               </div>
+              <div style="margin-top:12px;display:flex;align-items:center;justify-content:space-between;gap:8px">
+                <HansCyclePulse :timestamps="sparrowCycleTimestamps(s)" :cycles="12"/>
+                <span style="font-family:'Geist Mono',monospace;font-size:10px;color:var(--ink-4)">last 1h</span>
+              </div>
             </div>
           </div>
         </NuxtLink>
@@ -338,3 +494,9 @@ onUnmounted(() => clearInterval(refreshTimer))
     </template>
   </div>
 </template>
+
+<style>
+@media (max-width: 1100px) {
+  .hans-narrative-row { grid-template-columns: 1fr !important; }
+}
+</style>
