@@ -17,9 +17,9 @@
       />
       <text
         :x="padL - 8" :y="yFor(v) + 3"
-        text-anchor="end" font-size="10"
+        text-anchor="end" font-size="10.5"
         fill="var(--ink-3)"
-        font-family="Geist Mono, monospace"
+        class="hans-chart-text"
       >{{ decimals === 0 ? Math.round(v) : v.toFixed(decimals) }}</text>
     </g>
 
@@ -28,9 +28,9 @@
       v-for="(lab, i) in xLabels" :key="lab"
       :x="padL + (i / (xLabels.length - 1)) * (W - padL - padR)"
       :y="H - 6"
-      text-anchor="middle" font-size="10"
+      text-anchor="middle" font-size="10.5"
       fill="var(--ink-4)"
-      font-family="Geist Mono, monospace"
+      class="hans-chart-text"
     >{{ lab }}</text>
 
     <!-- Lines -->

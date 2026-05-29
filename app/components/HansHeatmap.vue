@@ -114,8 +114,11 @@ const cells = computed(() => {
   display: grid;
   grid-template-rows: repeat(7, 1fr);
   gap: 3px;
-  font-family: 'Geist Mono', monospace;
-  font-size: 10px;
+  font-family: var(--font-chart);
+  font-feature-settings: 'tnum' 1;
+  font-size: 10.5px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
   color: var(--ink-4);
   align-items: center;
   text-align: right;
@@ -155,8 +158,11 @@ const cells = computed(() => {
   flex: 1;
   height: 14px;
   margin-left: 44px;
-  font-family: 'Geist Mono', monospace;
-  font-size: 10px;
+  font-family: var(--font-chart);
+  font-feature-settings: 'tnum' 1;
+  font-size: 10.5px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
   color: var(--ink-4);
 }
 .hans-heatmap-xaxis span {
@@ -180,5 +186,5 @@ const cells = computed(() => {
   border: 1px solid var(--line-soft);
   /* background set inline from comfortGradientCss(theme) */
 }
-.hans-heatmap-legend .meta { margin-left: 12px; font-family: 'Geist Mono', monospace; }
+.hans-heatmap-legend .meta { margin-left: 12px; font-family: var(--font-chart); font-feature-settings: 'tnum' 1; letter-spacing: 0.04em; }
 </style>

@@ -11,6 +11,11 @@
      (app/plugins/theme.ts) from app/composables/useTheme.ts.
      Edit colors there — not here. */
 
+  /* Typography */
+  --font-sans:  'Geist', -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-mono:  'Geist Mono', ui-monospace, monospace;
+  --font-chart: 'Inter', 'Geist', sans-serif;   /* used for axis labels, heatmap, legends */
+
   --shadow-soft: 0 1px 0 oklch(1 0 0 / 0.04) inset, 0 1px 2px oklch(0 0 0 / 0.3);
   --shadow-card: 0 1px 0 oklch(1 0 0 / 0.05) inset, 0 6px 24px oklch(0 0 0 / 0.35);
   --shadow-glow: 0 0 24px color-mix(in oklab, var(--leaf) 20%, transparent);
@@ -25,7 +30,7 @@
 /* Base */
 html, body { margin: 0; padding: 0; }
 body {
-  font-family: 'Geist', -apple-system, BlinkMacSystemFont, sans-serif;
+  font-family: var(--font-sans);
   background: var(--bg);
   color: var(--ink);
   font-size: 14px;
@@ -35,7 +40,15 @@ body {
   min-height: 100vh;
   overflow-x: hidden;
 }
-.hans-mono { font-family: 'Geist Mono', ui-monospace, monospace; font-feature-settings: 'tnum' 1; }
+.hans-mono { font-family: var(--font-mono); font-feature-settings: 'tnum' 1; }
+
+/* Chart text — Inter with tabular figures so columns of numbers line up cleanly */
+.hans-chart-text {
+  font-family: var(--font-chart);
+  font-feature-settings: 'tnum' 1, 'cv11' 1;
+  letter-spacing: 0.01em;
+  font-weight: 500;
+}
 
 /* Film grain overlay */
 body::before {
@@ -353,8 +366,8 @@ body::before {
 .hans-chart-head .label { display: flex; align-items: center; gap: 10px; }
 .hans-chart-head .label .dot { width: 8px; height: 8px; border-radius: 50%; }
 .hans-chart-head .name { font-size: 13px; color: var(--ink); font-weight: 500; }
-.hans-chart-head .unit { font-size: 12px; color: var(--ink-3); margin-left: 6px; font-family: 'Geist Mono', monospace; }
-.hans-chart-head .range-mini { display: flex; gap: 10px; font-size: 11px; color: var(--ink-4); font-family: 'Geist Mono', monospace; }
+.hans-chart-head .unit { font-size: 12px; color: var(--ink-3); margin-left: 6px; font-family: var(--font-chart); font-feature-settings: 'tnum' 1; letter-spacing: 0.01em; }
+.hans-chart-head .range-mini { display: flex; gap: 10px; font-size: 11.5px; color: var(--ink-4); font-family: var(--font-chart); font-feature-settings: 'tnum' 1; letter-spacing: 0.02em; font-weight: 500; }
 .hans-chart-svg { width: 100%; display: block; }
 .hans-legend { display: flex; gap: 14px; flex-wrap: wrap; padding: 10px 4px 0; }
 .hans-legend-item { display: inline-flex; align-items: center; gap: 7px; font-size: 11px; color: var(--ink-3); }
