@@ -49,9 +49,9 @@ const { data: rows, status, refresh } = await useAsyncData<Reading[]>(
       .select('sparrow_id, metric, value, recorded_at')
       .eq('sparrow_id', sparrowId.value)
       .gte('recorded_at', since.value)
-      .order('recorded_at', { ascending: true })
+      .order('recorded_at', { ascending: false })
     if (error) throw error
-    return (data ?? []) as Reading[]
+    return ((data ?? []) as Reading[]).reverse()
   },
   { watch: [since, sparrowId] }
 )
