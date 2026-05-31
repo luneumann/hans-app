@@ -80,12 +80,12 @@ export const THEMES: Record<string, Theme> = {
       plum:      '#8890b8',
       plumSoft:  'rgba(136, 144, 184, 0.22)',
     },
-    // Heatmap gradient: rose → lavender → sky → mint (skips ugly yellow-green zone)
+    // Heatmap gradient anchored to theme accent colors: rose (bad) → amber (ok) → leaf (good)
     comfortStops: [
-      { at: 0.00, L: 0.50, C: 0.16, h: 18  },
-      { at: 0.33, L: 0.68, C: 0.19, h: 290 },
-      { at: 0.66, L: 0.82, C: 0.24, h: 215 },
-      { at: 1.00, L: 0.92, C: 0.30, h: 155 },
+      { at: 0.00, L: 0.55, C: 0.15, h: 27  },  // --rose  (#e06858)
+      { at: 0.35, L: 0.68, C: 0.16, h: 52  },  // rose → amber blend
+      { at: 0.65, L: 0.82, C: 0.16, h: 75  },  // --amber (#f0b83c)
+      { at: 1.00, L: 0.72, C: 0.12, h: 148 },  // --leaf  (#6ab87a)
     ],
     // Aurora hue mapping by temperature
     auroraStops: [
@@ -122,11 +122,12 @@ export const THEMES: Record<string, Theme> = {
       plum:      'oklch(0.86 0.16 310)',
       plumSoft:  'oklch(0.86 0.16 310 / 0.22)',
     },
+    // Heatmap gradient anchored to theme accent colors: rose (bad) → amber (ok) → leaf (good)
     comfortStops: [
-      { at: 0.00, L: 0.50, C: 0.17, h: 350 },
-      { at: 0.33, L: 0.68, C: 0.20, h: 30  },
-      { at: 0.66, L: 0.80, C: 0.24, h: 80  },
-      { at: 1.00, L: 0.92, C: 0.28, h: 130 },
+      { at: 0.00, L: 0.74, C: 0.17, h: 350 },  // --rose  (oklch 0.86 0.16 350)
+      { at: 0.35, L: 0.80, C: 0.17, h: 20  },  // rose → amber blend
+      { at: 0.65, L: 0.88, C: 0.16, h: 65  },  // --amber (oklch 0.90 0.16 65)
+      { at: 1.00, L: 0.86, C: 0.18, h: 130 },  // --leaf  (oklch 0.86 0.18 130)
     ],
     auroraStops: [
       { temp: 15, hue: 285 },
