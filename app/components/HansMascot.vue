@@ -46,7 +46,7 @@ const props = withDefaults(defineProps<{
   humidity?: number     // %, reserved for future fine-tuning
 }>(), { size: 160, vitality: 75, humidity: 50 })
 
-const uid = Math.random().toString(36).slice(2, 8)
+const uid = useId()
 const leafGradId = `hans-leaf-${uid}`
 const glowId = `hans-glow-${uid}`
 const potId = `hans-pot-${uid}`

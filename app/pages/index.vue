@@ -256,15 +256,21 @@ const mascotDetail = computed(() => {
 const heroTemp = computed(() => houseAvg('temperature'))
 const heroHum  = computed(() => houseAvg('humidity'))
 
-const now = ref(new Date())
-const hour = computed(() => now.value.getHours())
-const greeting = computed(() => hour.value < 6 ? 'Quiet hours' : hour.value < 12 ? 'Good morning' : hour.value < 18 ? 'Good afternoon' : 'Good evening')
-const timeStr = computed(() => now.value.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' }))
+const now = ref<Date | null>(null)
+const hour = computed(() => now.value?.getHours() ?? null)
+const greeting = computed(() => {
+  const h = hour.value
+  if (h === null) return ''
+  return h < 6 ? 'Quiet hours' : h < 12 ? 'Good morning' : h < 18 ? 'Good afternoon' : 'Good evening'
+})
+const timeStr = computed(() => now.value?.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' }) ?? '')
+const dateStr = computed(() => now.value?.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) ?? '')
 
 // Auto-refresh every 5 seconds
 let refreshTimer: ReturnType<typeof setInterval>
 let weekTimer: ReturnType<typeof setInterval>
 onMounted(() => {
+  now.value = new Date()
   refreshTimer = setInterval(() => {
     now.value = new Date()
     refresh()
@@ -288,7 +294,7 @@ onUnmounted(() => {
       <div class="hans-aurora" :style="{ '--aurora-hue': auroraHue, '--aurora-hue-2': auroraHue2 }"></div>
       <div class="hans-hero-content">
         <div>
-          <div class="hans-hero-greeting">{{ greeting }} — {{ timeStr }} local</div>
+          <div v-if="greeting" class="hans-hero-greeting">{{ greeting }} — {{ timeStr }} local</div>
           <h1 class="hans-hero-title">
             <template v-if="heroTemp !== null && heroHum !== null">
               The house feels <em><AnimatedNumber :value="heroTemp" :decimals="1"/>°</em>
@@ -323,7 +329,7 @@ onUnmounted(() => {
           </div>
         </div>
         <div class="hans-hero-meta">
-          <div class="hans-pill hans-mono">{{ new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) }}</div>
+          <div class="hans-pill hans-mono">{{ dateStr }}</div>
           <div class="hans-pill hans-mono">data · {{ selectedRange }} window</div>
         </div>
       </div>

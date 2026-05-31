@@ -26,7 +26,7 @@ const props = defineProps<{
 
 const W = 280
 const h = computed(() => props.height ?? 36)
-const gradId = `spark-${Math.random().toString(36).slice(2, 8)}`
+const gradId = `spark-${useId()}`
 
 const linePath = computed(() => {
   if (!props.data.length) return ''
