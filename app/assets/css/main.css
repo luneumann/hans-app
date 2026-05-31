@@ -198,6 +198,8 @@ body::before {
 .hans-hero-greeting { font-size: 13px; color: var(--ink-3); letter-spacing: 0.16em; text-transform: uppercase; }
 .hans-hero-title { font-size: 34px; font-weight: 500; letter-spacing: -0.02em; margin: 10px 0 6px; }
 .hans-hero-title em { font-style: normal; color: var(--amber); }
+.hans-hero-outside { font-size: 18px; font-weight: 400; color: var(--ink-2); letter-spacing: -0.01em; margin: 0 0 8px; }
+.hans-hero-outside em { font-style: normal; color: var(--sky); }
 .hans-hero-sub { color: var(--ink-2); font-size: 15px; max-width: 56ch; }
 .hans-hero-tags { display: flex; gap: 8px; margin-top: 18px; flex-wrap: wrap; }
 .hans-hero-meta { display: flex; flex-direction: column; gap: 14px; align-items: flex-end; justify-content: flex-end; }

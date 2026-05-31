@@ -89,6 +89,11 @@ const sparrows = computed(() =>
   [...new Set((rows.value ?? []).map(r => r.sparrow_id))].sort()
 )
 
+function isOutdoor(id: string) { return id.toLowerCase().includes('balcony') }
+
+const indoorSparrows = computed(() => sparrows.value.filter(s => !isOutdoor(s)))
+const outdoorSparrows = computed(() => sparrows.value.filter(s => isOutdoor(s)))
+
 const byGroup = computed(() => {
   const map = new Map<string, Map<string, Reading[]>>()
   for (const r of rows.value ?? []) {
@@ -108,7 +113,15 @@ function latestValue(sparrowId: string, metricId: string): number | null {
 }
 
 function houseAvg(metricId: string): number | null {
-  const vals = sparrows.value
+  const vals = indoorSparrows.value
+    .map(s => latestValue(s, metricId))
+    .filter((v): v is number => v !== null)
+  if (!vals.length) return null
+  return vals.reduce((a, b) => a + b, 0) / vals.length
+}
+
+function outdoorAvg(metricId: string): number | null {
+  const vals = outdoorSparrows.value
     .map(s => latestValue(s, metricId))
     .filter((v): v is number => v !== null)
   if (!vals.length) return null
@@ -176,7 +189,7 @@ function trend(sparrowId: string, metricId: string): number {
   return recent - earlier
 }
 function avgTrend(metricId: string): number {
-  const vals = sparrows.value.map(s => trend(s, metricId))
+  const vals = indoorSparrows.value.map(s => trend(s, metricId))
   return vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : 0
 }
 
@@ -256,8 +269,10 @@ const mascotDetail = computed(() => {
 })
 
 // Hero text
-const heroTemp = computed(() => houseAvg('temperature'))
-const heroHum  = computed(() => houseAvg('humidity'))
+const heroTemp    = computed(() => houseAvg('temperature'))
+const heroHum     = computed(() => houseAvg('humidity'))
+const outsideTemp = computed(() => outdoorAvg('temperature'))
+const outsideHum  = computed(() => outdoorAvg('humidity'))
 
 const now = ref<Date | null>(null)
 const hour = computed(() => now.value?.getHours() ?? null)
@@ -307,6 +322,10 @@ onUnmounted(() => {
               HANS is listening.
             </template>
           </h1>
+          <div v-if="outsideTemp !== null && outsideHum !== null" class="hans-hero-outside">
+            Outside feels <em><AnimatedNumber :value="outsideTemp" :decimals="1"/>°</em>
+            and <em><AnimatedNumber :value="outsideHum" :decimals="0"/>%</em>.
+          </div>
           <div class="hans-hero-sub">
             <template v-if="sparrows.length">
               {{ sparrows.length }} sparrow{{ sparrows.length !== 1 ? 's' : '' }} reporting in the last {{ selectedRange }}.
