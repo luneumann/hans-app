@@ -130,14 +130,14 @@ function relativeTime(date: Date): string {
 const lastSeen = computed(() => {
   const all = rows.value ?? []
   if (!all.length) return 'no data'
-  return relativeTime(new Date(all[all.length - 1].recorded_at))
+  return relativeTime(parseRecordedAt(all[all.length - 1].recorded_at))
 })
 
 // Online: last reading within 11 min (5-min wake cycle + margin)
 const isOnline = computed(() => {
   const all = rows.value ?? []
   if (!all.length) return false
-  return (Date.now() - new Date(all[all.length - 1].recorded_at).getTime()) < 11 * 60 * 1000
+  return (Date.now() - parseRecordedAt(all[all.length - 1].recorded_at).getTime()) < 11 * 60 * 1000
 })
 
 // Data health: actual wake cycles vs expected for the window.
@@ -218,7 +218,7 @@ const recentEvents = computed(() => {
   for (let i = humReadings.length - 1; i > 0 && events.length < 2; i--) {
     const prev = humReadings[i - 1].value
     const curr = humReadings[i].value
-    const ts = new Date(humReadings[i].recorded_at).getTime()
+    const ts = parseRecordedAt(humReadings[i].recorded_at).getTime()
     if (prev < 60 && curr >= 60)
       events.push({ ts, when: relativeTime(new Date(ts)), text: 'Humidity crossed 60% — ventilation recommended.' })
     else if (prev >= 60 && curr < 60)
@@ -228,21 +228,21 @@ const recentEvents = computed(() => {
   const tempVals = byMetric.value.get('temperature') ?? []
   if (tempVals.length) {
     const peak = tempVals.reduce((a, b) => a.value > b.value ? a : b)
-    const peakTs = new Date(peak.recorded_at).getTime()
+    const peakTs = parseRecordedAt(peak.recorded_at).getTime()
     events.push({ ts: peakTs, when: relativeTime(new Date(peakTs)), text: `Temperature peak: ${peak.value.toFixed(1)} °C.` })
 
     const trough = tempVals.reduce((a, b) => a.value < b.value ? a : b)
     if (trough.recorded_at !== peak.recorded_at) {
-      const troughTs = new Date(trough.recorded_at).getTime()
+      const troughTs = parseRecordedAt(trough.recorded_at).getTime()
       events.push({ ts: troughTs, when: relativeTime(new Date(troughTs)), text: `Temperature low: ${trough.value.toFixed(1)} °C.` })
     }
   }
 
   // Signal gaps > 10 min (WiFi drops, brownouts)
   for (let i = tempVals.length - 1; i > 0 && events.length < 5; i--) {
-    const gap = new Date(tempVals[i].recorded_at).getTime() - new Date(tempVals[i - 1].recorded_at).getTime()
+    const gap = parseRecordedAt(tempVals[i].recorded_at).getTime() - parseRecordedAt(tempVals[i - 1].recorded_at).getTime()
     if (gap > 10 * 60 * 1000) {
-      const ts = new Date(tempVals[i].recorded_at).getTime()
+      const ts = parseRecordedAt(tempVals[i].recorded_at).getTime()
       events.push({ ts, when: relativeTime(new Date(ts)), text: `Signal gap: ${Math.round(gap / 60000)} min without data.` })
       break
     }
@@ -260,7 +260,7 @@ const auroraHue2 = computed(() => (auroraHue.value + 50 + 360) % 360)
 const cycleTimestamps = computed(() => {
   const tempReadings = byMetric.value.get('temperature') ?? []
   const cutoff = Date.now() - 60 * 60 * 1000
-  return tempReadings.filter(r => new Date(r.recorded_at).getTime() >= cutoff).map(r => r.recorded_at)
+  return tempReadings.filter(r => parseRecordedAt(r.recorded_at).getTime() >= cutoff).map(r => r.recorded_at)
 })
 
 // Auto-refresh every 5 seconds

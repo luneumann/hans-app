@@ -153,7 +153,7 @@ function sparrowColor(idx: number) { return SPARROW_COLORS[idx % SPARROW_COLORS.
 function isOnlineSparrow(id: string): boolean {
   const readings = byGroup.value.get(id)?.get('temperature') ?? []
   if (!readings.length) return false
-  return (Date.now() - new Date(readings[readings.length - 1].recorded_at).getTime()) < 11 * 60 * 1000
+  return (Date.now() - parseRecordedAt(readings[readings.length - 1].recorded_at).getTime()) < 11 * 60 * 1000
 }
 const onlineCount = computed(() => sparrows.value.filter(isOnlineSparrow).length)
 
@@ -161,7 +161,7 @@ const onlineCount = computed(() => sparrows.value.filter(isOnlineSparrow).length
 function sparrowCycleTimestamps(id: string): string[] {
   const readings = byGroup.value.get(id)?.get('temperature') ?? []
   const cutoff = Date.now() - 60 * 60 * 1000
-  return readings.filter(r => new Date(r.recorded_at).getTime() >= cutoff).map(r => r.recorded_at)
+  return readings.filter(r => parseRecordedAt(r.recorded_at).getTime() >= cutoff).map(r => r.recorded_at)
 }
 
 function trend(sparrowId: string, metricId: string): number {
