@@ -64,20 +64,48 @@ function localDayDiff(later: Date, earlier: Date): number {
 }
 
 /**
- * Recompute "now" reactively whenever readings change so the labels stay
- * fresh if the page is open across midnight (without this, dayLabels was
- * computed once at mount and silently became wrong the next day).
+ * `now` is intentionally null during SSR and the first client paint, then
+ * set in onMounted. Two reasons:
+ *
+ *   1. SSR runs on a Node server in UTC. If we used `new Date()` during
+ *      SSR, the buckets and weekday labels would be computed for a different
+ *      timezone than the visitor's — and Vue's computed cache survives
+ *      hydration when no dependency changes, so the wrong values stuck
+ *      around until the next auto-refresh. That matches the symptom:
+ *      "wrong on reload, fixes itself over time".
+ *
+ *   2. Rendering an identical empty skeleton on both server and client
+ *      avoids a hydration mismatch.
+ *
+ * After mount we also tick `now` every minute so labels stay fresh if
+ * the page is left open across midnight.
  */
-const nowTick = computed(() => {
-  // touch readings so this recomputes on every refresh
-  void props.readings.length
-  return new Date()
+const now = ref<Date | null>(null)
+let nowInterval: ReturnType<typeof setInterval> | undefined
+onMounted(() => {
+  now.value = new Date()
+  nowInterval = setInterval(() => { now.value = new Date() }, 60_000)
 })
+onUnmounted(() => { if (nowInterval) clearInterval(nowInterval) })
 
 const rows = computed(() => {
-  const now = nowTick.value
+  // Skeleton: same shape on server and pre-mount client → no hydration mismatch
+  if (!now.value) {
+    return Array.from({ length: DAYS.value }, (_, d) => ({
+      dayIdx: d,
+      label: '',
+      cells: Array.from({ length: 24 }, (_, h) => ({
+        key: `${d}-${h}`,
+        color: 'transparent',
+        title: '',
+        isNow: false,
+      })),
+    }))
+  }
+
+  const nowDate = now.value
   const dayLabelFor = (offsetDaysBack: number) => {
-    const d = new Date(now)
+    const d = new Date(nowDate)
     d.setDate(d.getDate() - offsetDaysBack)
     return d.toLocaleDateString('en-GB', { weekday: 'short' })
   }
@@ -86,7 +114,7 @@ const rows = computed(() => {
   const buckets = new Map<string, { temps: number[]; hums: number[] }>()
   for (const r of props.readings) {
     const ts = new Date(r.recorded_at)
-    const dayDiff = localDayDiff(now, ts)
+    const dayDiff = localDayDiff(nowDate, ts)
     if (dayDiff < 0 || dayDiff >= DAYS.value) continue
     const dayIdx = DAYS.value - 1 - dayDiff
     const hour = ts.getHours()
@@ -97,7 +125,7 @@ const rows = computed(() => {
     if (r.metric === 'humidity')    b.hums.push(r.value)
   }
 
-  const nowHour = now.getHours()
+  const nowHour = nowDate.getHours()
   const nowDayIdx = DAYS.value - 1
 
   const result: Array<{
