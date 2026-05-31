@@ -20,11 +20,24 @@ const SPARROW_IMAGES: Record<string, string> = {
   balcony: '/sparrows/balcony.png',
   study:   '/sparrows/living-night.png',
 }
+const SPARROW_IMAGES_MOBILE: Record<string, string> = {
+  living:  '/sparrows/living-mobile.png',
+  bedroom: '/sparrows/bedroom-mobile.png',
+  kitchen: '/sparrows/living-mobile.png',
+  balcony: '/sparrows/balcony-mobile.png',
+  study:   '/sparrows/home-mobile.png',
+}
 function sparrowImage(id: string) {
   for (const [key, img] of Object.entries(SPARROW_IMAGES)) {
     if (id.toLowerCase().includes(key)) return img
   }
   return '/sparrows/living-day.png'
+}
+function sparrowMobileImage(id: string) {
+  for (const [key, img] of Object.entries(SPARROW_IMAGES_MOBILE)) {
+    if (id.toLowerCase().includes(key)) return img
+  }
+  return '/sparrows/home-mobile.png'
 }
 
 const SPARROW_MOODS: Record<string, string[]> = {
@@ -369,7 +382,8 @@ onUnmounted(() => {
 
     <!-- HERO -->
     <div class="hans-hero">
-      <div class="hans-hero-img" :style="{ backgroundImage: `url(${sparrowImage(sparrowId)})` }"></div>
+      <div class="hans-hero-img hans-hero-img--desktop" :style="{ backgroundImage: `url(${sparrowImage(sparrowId)})` }"></div>
+      <div class="hans-hero-img hans-hero-img--mobile" :style="{ backgroundImage: `url(${sparrowMobileImage(sparrowId)})` }"></div>
       <div class="hans-hero-content">
         <div>
           <div class="hans-hero-greeting hans-mono">{{ sparrowId }}</div>

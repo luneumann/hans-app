@@ -150,6 +150,7 @@ body::before {
   background-position: center;
   filter: saturate(0.95) brightness(0.85);
 }
+.hans-hero-img--mobile { display: none; }
 .hans-hero-img::after {
   content: '';
   position: absolute; inset: 0;
@@ -519,6 +520,10 @@ body::before {
   .hans-hero-outside { font-size: 15px; }
   .hans-hero-meta { flex-direction: row; justify-content: flex-start; align-items: center; gap: 8px; }
   .hans-hero-tags { gap: 6px; }
+
+  /* Sparrow hero: swap to mobile image */
+  .hans-hero-img--desktop { display: none; }
+  .hans-hero-img--mobile { display: block; }
 
   /* Heatmap: prevent overflow, tighter gaps */
   .hans-heatmap { --hm-label-col: 28px; --hm-col-gap: 2px; overflow: hidden; }
