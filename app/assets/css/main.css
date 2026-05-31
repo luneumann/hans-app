@@ -550,6 +550,9 @@ body::before {
     -webkit-tap-highlight-color: transparent;
   }
   .hans-bottom-nav-link svg { width: 26px; height: 26px; }
-  .hans-bottom-nav-link.active { color: var(--leaf); }
-  .hans-bottom-nav-link.active svg { filter: drop-shadow(0 0 6px var(--leaf)); }
+  .hans-bottom-nav-link.active {
+    color: var(--leaf);
+    background: color-mix(in oklab, var(--leaf) 14%, transparent);
+    border-radius: 14px;
+  }
 }
