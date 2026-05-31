@@ -249,4 +249,28 @@ const rows = computed(() => {
   /* background set inline from comfortGradientCss(theme) */
 }
 .hans-heatmap-legend .meta { margin-left: 12px; font-family: var(--font-chart); font-feature-settings: 'tnum' 1; letter-spacing: 0.04em; }
+
+@media (max-width: 640px) {
+  .hans-heatmap {
+    --hm-label-col: 24px;
+    --hm-col-gap: 1px;
+    --hm-row-gap: 2px;
+    overflow: hidden;
+  }
+  .hans-heatmap-rowlabel { font-size: 9px; }
+  .hans-heatmap-cell {
+    aspect-ratio: unset;
+    height: 8px;
+    border-radius: 2px;
+    border-width: 0;
+  }
+  .hans-heatmap-cell.now { border-width: 1px; }
+  .hans-heatmap-foot {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 6px;
+  }
+  .hans-heatmap-legend .meta { display: none; }
+  .hans-heatmap-xaxis { font-size: 9px; }
+}
 </style>
