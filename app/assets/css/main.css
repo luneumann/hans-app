@@ -551,8 +551,8 @@ body::before {
   }
   .hans-bottom-nav-link svg { width: 26px; height: 26px; }
   .hans-bottom-nav-link.active {
-    color: var(--leaf);
-    background: color-mix(in oklab, var(--leaf) 14%, transparent);
+    color: #002b8f;
+    background: color-mix(in oklab, #002b8f 18%, transparent);
     border-radius: 14px;
   }
 }
