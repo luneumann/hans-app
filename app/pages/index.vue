@@ -309,7 +309,6 @@ onUnmounted(() => {
     <!-- HERO -->
     <div class="hans-hero">
       <div class="hans-hero-img" style="background-image: url('/sparrows/home.png')"></div>
-      <div class="hans-aurora" :style="{ '--aurora-hue': auroraHue, '--aurora-hue-2': auroraHue2 }"></div>
       <div class="hans-hero-content">
         <div>
           <div v-if="greeting" class="hans-hero-greeting">{{ greeting }} — {{ timeStr }} local</div>
