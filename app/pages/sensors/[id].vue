@@ -27,6 +27,49 @@ function sparrowImage(id: string) {
   return '/sparrows/living-day.png'
 }
 
+const SPARROW_MOODS: Record<string, string[]> = {
+  living: [
+    'Der Mittelpunkt von allem. Irgendwie immer.',
+    'Licht an, Tür zu, Welt draußen.',
+    'Ein guter Raum erinnert sich an alles, was in ihm war.',
+  ],
+  bedroom: [
+    'Schlaf ist die klügste Entscheidung des Tages.',
+    'Hier darf man einfach weg sein.',
+    'Der einzige Raum, der einen nie verurteilt.',
+  ],
+  kitchen: [
+    'Kaffee zuerst. Alles andere danach.',
+    'Wärme entsteht hier fast von allein.',
+    'Irgendwas kocht hier immer — meistens buchstäblich.',
+  ],
+  balcony: [
+    'Frische Luft löst erstaunlich viele Probleme.',
+    'Draußen sein, aber trotzdem zuhause.',
+    'Der Himmel ändert sich. Der Balkon nicht.',
+  ],
+  study: [
+    'Stille ist manchmal das lauteste, was ein Raum zu sagen hat.',
+    'Gedanken brauchen einen Ort.',
+    'Hier passiert das meiste ohne Aufhebens.',
+  ],
+}
+const SPARROW_MOODS_DEFAULT = [
+  'Ein Raum ist immer mehr als vier Wände.',
+  'Hier ist gut sein.',
+  'Jeder Ort hat seine eigene Temperatur.',
+]
+
+const quoteIndex = ref(0)
+
+const sparrowMood = computed(() => {
+  for (const [key, texts] of Object.entries(SPARROW_MOODS)) {
+    if (sparrowId.value.toLowerCase().includes(key))
+      return texts[quoteIndex.value % texts.length]
+  }
+  return SPARROW_MOODS_DEFAULT[quoteIndex.value % SPARROW_MOODS_DEFAULT.length]
+})
+
 const route = useRoute()
 const sparrowId = computed(() => route.params.id as string)
 
@@ -264,15 +307,14 @@ const cycleTimestamps = computed(() => {
   return tempReadings.filter(r => parseRecordedAt(r.recorded_at).getTime() >= cutoff).map(r => r.recorded_at)
 })
 
-// Auto-refresh every 5 seconds
+// Auto-refresh every 5 seconds, quote cycles every 20 seconds
 let refreshTimer: ReturnType<typeof setInterval>
+let quoteTimer: ReturnType<typeof setInterval>
 onMounted(() => {
-  refreshTimer = setInterval(() => {
-    refresh()
-    refreshY()
-  }, 5000)
+  refreshTimer = setInterval(() => { refresh(); refreshY() }, 5000)
+  quoteTimer = setInterval(() => { quoteIndex.value++ }, 20000)
 })
-onUnmounted(() => clearInterval(refreshTimer))
+onUnmounted(() => { clearInterval(refreshTimer); clearInterval(quoteTimer) })
 </script>
 
 <template>
@@ -293,7 +335,7 @@ onUnmounted(() => clearInterval(refreshTimer))
         <div>
           <div class="hans-hero-greeting hans-mono">{{ sparrowId }}</div>
           <h1 class="hans-hero-title">{{ sparrowId }}</h1>
-          <div class="hans-hero-sub">ESP8266 + BME280 — wakes every 5 minutes, posts temperature, humidity, and pressure, then sleeps again.</div>
+          <div class="hans-hero-sub">{{ sparrowMood }}</div>
           <div class="hans-hero-tags">
             <span class="hans-chip">
               <span class="dot" :style="{ background: isOnline ? 'var(--leaf)' : 'var(--clay)' }"></span>
