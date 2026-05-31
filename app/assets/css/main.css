@@ -150,7 +150,7 @@ body::before {
   background-position: center;
   filter: saturate(0.95) brightness(0.85);
 }
-.hans-hero-img--mobile { display: none; }
+.hans-hero-img--mobile { display: none; transform: scale(1.1); }
 .hans-hero-img::after {
   content: '';
   position: absolute; inset: 0;
