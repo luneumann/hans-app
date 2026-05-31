@@ -542,17 +542,26 @@ body::before {
   }
   .hans-bottom-nav-link {
     flex: 1;
+    position: relative;
     display: flex; align-items: center; justify-content: center;
     text-decoration: none;
     color: var(--ink-3);
     padding: 10px 8px;
-    transition: color 0.15s;
+    transition: color 0.2s;
     -webkit-tap-highlight-color: transparent;
   }
-  .hans-bottom-nav-link svg { width: 26px; height: 26px; }
-  .hans-bottom-nav-link.active {
-    color: #002b8f;
-    background: color-mix(in oklab, #002b8f 18%, transparent);
-    border-radius: 14px;
+  .hans-bottom-nav-link svg { width: 26px; height: 26px; transition: transform 0.15s ease, color 0.15s ease; }
+  .hans-bottom-nav-link.active { color: var(--ink); }
+  .hans-bottom-nav-link.active svg { transform: scale(1.05); }
+  .hans-bottom-nav-link.active::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 20px;
+    height: 2px;
+    background: var(--ink);
+    border-radius: 0 0 4px 4px;
   }
 }
