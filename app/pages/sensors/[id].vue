@@ -29,35 +29,35 @@ function sparrowImage(id: string) {
 
 const SPARROW_MOODS: Record<string, string[]> = {
   living: [
-    'Der Mittelpunkt von allem. Irgendwie immer.',
-    'Licht an, Tür zu, Welt draußen.',
-    'Ein guter Raum erinnert sich an alles, was in ihm war.',
+    'The center of everything. Somehow always.',
+    'Lights on, door closed, world outside.',
+    'A good room remembers everything that ever happened in it.',
   ],
   bedroom: [
-    'Schlaf ist die klügste Entscheidung des Tages.',
-    'Hier darf man einfach weg sein.',
-    'Der einzige Raum, der einen nie verurteilt.',
+    'Sleep is the smartest decision of the day.',
+    'The one room that never judges you.',
+    'Permission to be completely elsewhere.',
   ],
   kitchen: [
-    'Kaffee zuerst. Alles andere danach.',
-    'Wärme entsteht hier fast von allein.',
-    'Irgendwas kocht hier immer — meistens buchstäblich.',
+    'Coffee first. Everything else after.',
+    'Warmth here is never accidental.',
+    'Something is always simmering — usually literally.',
   ],
   balcony: [
-    'Frische Luft löst erstaunlich viele Probleme.',
-    'Draußen sein, aber trotzdem zuhause.',
-    'Der Himmel ändert sich. Der Balkon nicht.',
+    'Fresh air solves a surprising number of problems.',
+    'Outside, but still home.',
+    'The sky changes. The balcony doesn\'t.',
   ],
   study: [
-    'Stille ist manchmal das lauteste, was ein Raum zu sagen hat.',
-    'Gedanken brauchen einen Ort.',
-    'Hier passiert das meiste ohne Aufhebens.',
+    'Silence is sometimes the loudest thing a room can say.',
+    'Thoughts need somewhere to land.',
+    'Most of the work happens quietly here.',
   ],
 }
 const SPARROW_MOODS_DEFAULT = [
-  'Ein Raum ist immer mehr als vier Wände.',
-  'Hier ist gut sein.',
-  'Jeder Ort hat seine eigene Temperatur.',
+  'A room is always more than four walls.',
+  'Good to be here.',
+  'Every place has its own temperature.',
 ]
 
 const QUOTE_INTERVAL_MS = 4 * 60 * 60 * 1000
