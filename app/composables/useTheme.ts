@@ -114,10 +114,10 @@ export const THEMES: Record<string, Theme> = {
     },
     // Heatmap gradient: rose → lavender → sky → mint (skips ugly yellow-green zone)
     comfortStops: [
-      { at: 0.00, L: 0.58, C: 0.10, h: 18  },
-      { at: 0.33, L: 0.72, C: 0.12, h: 290 },
-      { at: 0.66, L: 0.82, C: 0.16, h: 215 },
-      { at: 1.00, L: 0.88, C: 0.22, h: 155 },
+      { at: 0.00, L: 0.50, C: 0.16, h: 18  },
+      { at: 0.33, L: 0.68, C: 0.19, h: 290 },
+      { at: 0.66, L: 0.82, C: 0.24, h: 215 },
+      { at: 1.00, L: 0.92, C: 0.30, h: 155 },
     ],
     // Aurora hue mapping by temperature
     auroraStops: [
@@ -167,10 +167,10 @@ export const THEMES: Record<string, Theme> = {
       leafHueShift: 12,
     },
     comfortStops: [
-      { at: 0.00, L: 0.58, C: 0.10, h: 350 },
-      { at: 0.33, L: 0.72, C: 0.13, h: 30  },
-      { at: 0.66, L: 0.80, C: 0.16, h: 80  },
-      { at: 1.00, L: 0.88, C: 0.20, h: 130 },
+      { at: 0.00, L: 0.50, C: 0.17, h: 350 },
+      { at: 0.33, L: 0.68, C: 0.20, h: 30  },
+      { at: 0.66, L: 0.80, C: 0.24, h: 80  },
+      { at: 1.00, L: 0.92, C: 0.28, h: 130 },
     ],
     auroraStops: [
       { temp: 15, hue: 285 },
