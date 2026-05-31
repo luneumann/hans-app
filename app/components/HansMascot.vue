@@ -21,9 +21,9 @@ const mood = computed(() => {
 
 <style>
 .hans-mascot { display: flex; align-items: flex-end; justify-content: center; }
-.hans-mascot.tired   { --sway-speed: 8s;   --sway-amp: 2deg; }
-.hans-mascot.okay    { --sway-speed: 5.5s; --sway-amp: 3deg; }
-.hans-mascot.good    { --sway-speed: 4.5s; --sway-amp: 4deg; }
-.hans-mascot.glowing { --sway-speed: 3.8s; --sway-amp: 5deg; }
+.hans-mascot.tired   { --sway-speed: 9s;   --sway-amp: 0.8deg; }
+.hans-mascot.okay    { --sway-speed: 7s;   --sway-amp: 1.2deg; }
+.hans-mascot.good    { --sway-speed: 5.5s; --sway-amp: 1.6deg; }
+.hans-mascot.glowing { --sway-speed: 4.5s; --sway-amp: 2deg;   }
 .hans-mascot img { display: block; transform-origin: bottom center; animation: hans-sway var(--sway-speed) ease-in-out infinite; }
 </style>
