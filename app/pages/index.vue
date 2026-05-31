@@ -45,6 +45,7 @@ const { data: rows, status, refresh } = await useAsyncData<Reading[]>(
       .select('sparrow_id, metric, value, recorded_at')
       .gte('recorded_at', since.value)
       .order('recorded_at', { ascending: false })
+      .limit(9997)
     if (error) throw error
     return ((data ?? []) as Reading[]).reverse()
   },
@@ -78,6 +79,7 @@ const { data: weekRows, refresh: refreshWeek } = await useAsyncData<Reading[]>(
       .select('sparrow_id, metric, value, recorded_at')
       .gte('recorded_at', heatmapSince.value)
       .order('recorded_at', { ascending: false })
+      .limit(9997)
     if (error) throw error
     return ((data ?? []) as Reading[]).reverse()
   }

@@ -50,6 +50,7 @@ const { data: rows, status, refresh } = await useAsyncData<Reading[]>(
       .eq('sparrow_id', sparrowId.value)
       .gte('recorded_at', since.value)
       .order('recorded_at', { ascending: false })
+      .limit(9997)
     if (error) throw error
     return ((data ?? []) as Reading[]).reverse()
   },
