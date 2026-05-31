@@ -10,10 +10,7 @@
       <nav class="hans-nav">
         <NuxtLink to="/" class="hans-nav-brand">
           <div class="logo">
-            <svg viewBox="0 0 24 24" fill="none" stroke="var(--leaf)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M5 18V8M5 13h7M12 18V8"/>
-              <circle cx="18" cy="8" r="2" fill="var(--rose)" stroke="none"/>
-            </svg>
+            <img src="/favicon.svg" alt="HANS Logo" width="36" height="36"/>
           </div>
           <div>
             <div class="brand-title">HANS</div>
