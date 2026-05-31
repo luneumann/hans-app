@@ -7,9 +7,22 @@
    ================================================================ */
 
 :root {
-  /* Color tokens (--bg, --leaf, --rose, …) are injected by the theme plugin
-     (app/plugins/theme.ts) from app/composables/useTheme.ts.
-     Edit colors there — not here. */
+  /* Semantic color tokens — single source of truth for flat hex palette */
+  --bg-base:      #161a28;
+  --bg-surface:   #1a1e30;
+  --bg-card:      #1e2238;
+  --bg-elevated:  #222840;
+  --border:       #252a40;
+  --border-soft:  #353c60;
+
+  --text-primary: #d8dcea;
+  --text-muted:   #8890b8;
+  --text-faint:   #6870a0;
+
+  --accent-amber: #f0b83c;
+  --accent-blue:  #70a8f0;
+  --accent-green: #6ab87a;
+  --accent-red:   #e06858;
 
   /* Typography */
   --font-sans:  'Geist', -apple-system, BlinkMacSystemFont, sans-serif;
@@ -129,9 +142,7 @@ body::before {
 .hans-hero-img::after {
   content: '';
   position: absolute; inset: 0;
-  background:
-    linear-gradient(180deg, transparent 30%, color-mix(in oklab, var(--bg) 92%, transparent) 100%),
-    linear-gradient(90deg, color-mix(in oklab, var(--bg) 78%, transparent) 0%, color-mix(in oklab, var(--bg) 30%, transparent) 55%, transparent 100%);
+  background: linear-gradient(to bottom, rgba(22,26,40,0.45) 0%, rgba(22,26,40,0.75) 100%);
 }
 
 /* Hero Aurora — atmender Farbverlauf, gesteuert von --aurora-hue */
@@ -209,10 +220,10 @@ body::before {
   display: inline-flex; align-items: center; gap: 8px;
   padding: 6px 12px;
   border-radius: 999px;
-  background: color-mix(in oklab, var(--bg-soft) 80%, transparent);
-  border: 1px solid var(--line-soft);
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-soft);
   font-size: 12px;
-  color: var(--ink-2);
+  color: var(--text-muted);
   backdrop-filter: blur(6px);
 }
 .hans-chip .dot { width: 6px; height: 6px; border-radius: 50%; }
@@ -220,10 +231,10 @@ body::before {
   display: inline-flex; align-items: center; gap: 8px;
   padding: 8px 14px;
   border-radius: 999px;
-  background: color-mix(in oklab, var(--bg-soft) 60%, transparent);
-  border: 1px solid var(--line-soft);
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-soft);
   font-size: 13px;
-  color: var(--ink-2);
+  color: var(--text-muted);
 }
 
 /* ── Section heading ── */
@@ -237,9 +248,9 @@ body::before {
 
 /* ── Card ── */
 .hans-card {
-  background: linear-gradient(180deg, color-mix(in oklab, var(--panel) 100%, transparent), color-mix(in oklab, var(--panel) 92%, transparent));
-  border: 1px solid var(--line-soft);
-  border-radius: var(--r-lg);
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
   padding: 20px;
   box-shadow: var(--shadow-card);
 }

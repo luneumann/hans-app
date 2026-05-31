@@ -7,14 +7,14 @@ interface Reading {
 }
 
 const METRICS = [
-  { id: 'temperature', name: 'Temperature', unit: '°C',  color: 'var(--clay)',  icon: 'thermo', decimals: 1, short: 'Temp' },
-  { id: 'humidity',    name: 'Humidity',    unit: '%',   color: 'var(--sky)',   icon: 'drop',   decimals: 0, short: 'Hum'  },
-  { id: 'pressure',    name: 'Pressure',    unit: 'hPa', color: 'var(--plum)',  icon: 'pres',   decimals: 1, short: 'Pres' },
-  { id: 'light',       name: 'Light',       unit: 'lx',  color: 'var(--amber)', icon: 'sun',    decimals: 0, short: 'Lux'  },
+  { id: 'temperature', name: 'Temperature', unit: '°C',  color: 'var(--amber)',  icon: 'thermo', decimals: 1, short: 'Temp' },
+  { id: 'humidity',    name: 'Humidity',    unit: '%',   color: 'var(--sky)',    icon: 'drop',   decimals: 0, short: 'Hum'  },
+  { id: 'pressure',    name: 'Pressure',    unit: 'hPa', color: 'var(--ink-3)', icon: 'pres',   decimals: 1, short: 'Pres' },
+  { id: 'light',       name: 'Light',       unit: 'lx',  color: 'var(--ink-3)', icon: 'sun',    decimals: 0, short: 'Lux'  },
 ]
 
 const SPARROW_IMAGES: Record<string, string> = {
-  living:  '/sparrows/living-day.png',
+  living:  '/sparrows/living-room.png',
   bedroom: '/sparrows/bedroom.png',
   kitchen: '/sparrows/kitchen.png',
   balcony: '/sparrows/balcony.png',
@@ -308,7 +308,7 @@ onUnmounted(() => {
 
     <!-- HERO -->
     <div class="hans-hero">
-      <div class="hans-hero-img" style="background-image: url('/sparrows/living-day.png')"></div>
+      <div class="hans-hero-img" style="background-image: url('/sparrows/home.png')"></div>
       <div class="hans-aurora" :style="{ '--aurora-hue': auroraHue, '--aurora-hue-2': auroraHue2 }"></div>
       <div class="hans-hero-content">
         <div>

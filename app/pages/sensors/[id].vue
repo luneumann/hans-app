@@ -7,14 +7,14 @@ interface Reading {
 }
 
 const METRICS = [
-  { id: 'temperature', name: 'Temperature', unit: '°C',  color: 'var(--clay)',  icon: 'thermo', decimals: 1 },
-  { id: 'humidity',    name: 'Humidity',    unit: '%',   color: 'var(--sky)',   icon: 'drop',   decimals: 0 },
-  { id: 'pressure',    name: 'Pressure',    unit: 'hPa', color: 'var(--plum)',  icon: 'pres',   decimals: 1 },
-  { id: 'light',       name: 'Light',       unit: 'lx',  color: 'var(--amber)', icon: 'sun',    decimals: 0 },
+  { id: 'temperature', name: 'Temperature', unit: '°C',  color: 'var(--amber)',  icon: 'thermo', decimals: 1 },
+  { id: 'humidity',    name: 'Humidity',    unit: '%',   color: 'var(--sky)',    icon: 'drop',   decimals: 0 },
+  { id: 'pressure',    name: 'Pressure',    unit: 'hPa', color: 'var(--ink-3)', icon: 'pres',   decimals: 1 },
+  { id: 'light',       name: 'Light',       unit: 'lx',  color: 'var(--ink-3)', icon: 'sun',    decimals: 0 },
 ]
 
 const SPARROW_IMAGES: Record<string, string> = {
-  living:  '/sparrows/living-day.png',
+  living:  '/sparrows/living-room.png',
   bedroom: '/sparrows/bedroom.png',
   kitchen: '/sparrows/kitchen.png',
   balcony: '/sparrows/balcony.png',

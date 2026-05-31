@@ -68,37 +68,34 @@ export interface Theme {
 // ─── Themes ────────────────────────────────────────────────────────────────
 
 export const THEMES: Record<string, Theme> = {
-  // Default: deep forest-night with luminous pastel accents
+  // Default: deep navy night with flat hex design tokens
   'forest-rose': {
     name: 'Forest & Rose',
     tokens: {
-      // Background — deep cool forest green, no olive
-      bg:        'oklch(0.155 0.03 168)',
-      bgSoft:    'oklch(0.20 0.035 168)',
-      panel:     'oklch(0.235 0.04 168)',
-      panel2:    'oklch(0.265 0.042 168)',
-      line:      'oklch(0.38 0.05 168)',
-      lineSoft:  'oklch(0.32 0.04 168)',
+      bg:        '#161a28',
+      bgSoft:    '#1a1e30',
+      panel:     '#1e2238',
+      panel2:    '#222840',
+      line:      '#252a40',
+      lineSoft:  '#353c60',
 
-      // Inks — cool neutral, no warm undertones
-      ink:       'oklch(0.97 0.008 170)',
-      ink2:      'oklch(0.82 0.012 170)',
-      ink3:      'oklch(0.66 0.015 170)',
-      ink4:      'oklch(0.50 0.018 170)',
+      ink:       '#d8dcea',
+      ink2:      '#b0b6d1',
+      ink3:      '#8890b8',
+      ink4:      '#6870a0',
 
-      // Accents — luminous pastels (lifted L for brightness against dark bg)
-      leaf:      'oklch(0.85 0.22 155)',
-      leafSoft:  'oklch(0.85 0.22 155 / 0.22)',
-      rose:      'oklch(0.88 0.17 12)',
-      roseSoft:  'oklch(0.88 0.17 12 / 0.22)',
-      amber:     'oklch(0.90 0.14 55)',
-      amberSoft: 'oklch(0.90 0.14 55 / 0.22)',
-      sky:       'oklch(0.88 0.13 220)',
-      skySoft:   'oklch(0.88 0.13 220 / 0.22)',
-      clay:      'oklch(0.88 0.17 12)',          // alias of rose
-      claySoft:  'oklch(0.88 0.17 12 / 0.22)',
-      plum:      'oklch(0.86 0.15 295)',          // lavender
-      plumSoft:  'oklch(0.86 0.15 295 / 0.22)',
+      leaf:      '#6ab87a',
+      leafSoft:  'rgba(106, 184, 122, 0.22)',
+      rose:      '#e06858',
+      roseSoft:  'rgba(224, 104, 88, 0.22)',
+      amber:     '#f0b83c',
+      amberSoft: 'rgba(240, 184, 60, 0.22)',
+      sky:       '#70a8f0',
+      skySoft:   'rgba(112, 168, 240, 0.22)',
+      clay:      '#e06858',
+      claySoft:  'rgba(224, 104, 88, 0.22)',
+      plum:      '#8890b8',
+      plumSoft:  'rgba(136, 144, 184, 0.22)',
     },
     mascot: {
       potTop:    'oklch(0.66 0.12 12)',
