@@ -80,12 +80,12 @@ export const THEMES: Record<string, Theme> = {
       plum:      '#8890b8',
       plumSoft:  'rgba(136, 144, 184, 0.22)',
     },
-    // Heatmap gradient: pastel rose → peach → butter → mint — same hues as accent tokens
+    // Heatmap gradient: rot → salbei → tief blau → dunkelgrün
     comfortStops: [
-      { at: 0.00, L: 0.78, C: 0.10, h: 27  },  // pastel rose
-      { at: 0.35, L: 0.82, C: 0.10, h: 52  },  // pastel peach
-      { at: 0.65, L: 0.87, C: 0.11, h: 75  },  // pastel amber/butter
-      { at: 1.00, L: 0.84, C: 0.09, h: 148 },  // pastel mint
+      { at: 0.00, L: 0.75, C: 0.12, h: 25  },  // rot
+      { at: 0.33, L: 0.80, C: 0.07, h: 140 },  // salbei (muted grey-green)
+      { at: 0.66, L: 0.74, C: 0.12, h: 248 },  // tief blau
+      { at: 1.00, L: 0.64, C: 0.13, h: 155 },  // dunkelgrün
     ],
     // Aurora hue mapping by temperature
     auroraStops: [
@@ -122,12 +122,12 @@ export const THEMES: Record<string, Theme> = {
       plum:      'oklch(0.86 0.16 310)',
       plumSoft:  'oklch(0.86 0.16 310 / 0.22)',
     },
-    // Heatmap gradient: pastel rose → peach → butter → mint — same hues as accent tokens
+    // Heatmap gradient: rot → salbei → tief blau → dunkelgrün
     comfortStops: [
-      { at: 0.00, L: 0.82, C: 0.10, h: 350 },  // pastel rose
-      { at: 0.35, L: 0.85, C: 0.10, h: 20  },  // pastel peach
-      { at: 0.65, L: 0.89, C: 0.11, h: 65  },  // pastel amber/butter
-      { at: 1.00, L: 0.87, C: 0.11, h: 130 },  // pastel mint
+      { at: 0.00, L: 0.78, C: 0.12, h: 25  },  // rot
+      { at: 0.33, L: 0.83, C: 0.07, h: 140 },  // salbei (muted grey-green)
+      { at: 0.66, L: 0.78, C: 0.12, h: 248 },  // tief blau
+      { at: 1.00, L: 0.68, C: 0.13, h: 155 },  // dunkelgrün
     ],
     auroraStops: [
       { temp: 15, hue: 285 },
