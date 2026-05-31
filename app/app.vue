@@ -114,8 +114,8 @@ onMounted(() => {
   })
 
   function animate() {
-    curX += (targetX - curX) * 0.12
-    curY += (targetY - curY) * 0.12
+    curX += (targetX - curX) * 0.18
+    curY += (targetY - curY) * 0.18
     dotX.value = curX
     dotY.value = curY
     rafId = requestAnimationFrame(animate)
@@ -138,7 +138,7 @@ onUnmounted(() => {
   border-radius: 50%;
   pointer-events: none;
   z-index: 9999;
-  background: radial-gradient(circle, rgba(220, 160, 20, 0.75) 0%, rgba(200, 130, 10, 0.35) 45%, transparent 75%);
+  background: radial-gradient(circle, rgba(220, 160, 20, 0.45) 0%, rgba(220, 160, 20, 0.45) 50%, transparent 88%);
   will-change: transform;
   mix-blend-mode: screen;
 }
