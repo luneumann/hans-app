@@ -60,15 +60,52 @@ const SPARROW_MOODS_DEFAULT = [
   'Jeder Ort hat seine eigene Temperatur.',
 ]
 
-const quoteIndex = ref(0)
+const QUOTE_INTERVAL_MS = 4 * 60 * 60 * 1000
 
-const sparrowMood = computed(() => {
-  for (const [key, texts] of Object.entries(SPARROW_MOODS)) {
-    if (sparrowId.value.toLowerCase().includes(key))
-      return texts[quoteIndex.value % texts.length]
+function shuffleIndices(n: number): number[] {
+  const arr = Array.from({ length: n }, (_, i) => i)
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1))
+    ;[arr[i], arr[j]] = [arr[j], arr[i]]
   }
-  return SPARROW_MOODS_DEFAULT[quoteIndex.value % SPARROW_MOODS_DEFAULT.length]
-})
+  return arr
+}
+
+function sparrowTexts(id: string): string[] {
+  for (const [key, texts] of Object.entries(SPARROW_MOODS)) {
+    if (id.toLowerCase().includes(key)) return texts
+  }
+  return SPARROW_MOODS_DEFAULT
+}
+
+const currentQuote = ref('')
+let quoteTimer: ReturnType<typeof setTimeout> | null = null
+
+function advanceQuote() {
+  const id = sparrowId.value
+  const texts = sparrowTexts(id)
+  let queue: number[] = JSON.parse(localStorage.getItem(`hans_quote_q_${id}`) ?? '[]')
+  if (!queue.length) queue = shuffleIndices(texts.length)
+  const idx = queue.shift()!
+  currentQuote.value = texts[idx]
+  localStorage.setItem(`hans_quote_q_${id}`, JSON.stringify(queue))
+  localStorage.setItem(`hans_quote_last_${id}`, String(Date.now()))
+  localStorage.setItem(`hans_quote_val_${id}`, texts[idx])
+  quoteTimer = setTimeout(advanceQuote, QUOTE_INTERVAL_MS)
+}
+
+function initQuote() {
+  const id = sparrowId.value
+  const lastChanged = parseInt(localStorage.getItem(`hans_quote_last_${id}`) ?? '0')
+  const storedVal = localStorage.getItem(`hans_quote_val_${id}`)
+  const elapsed = Date.now() - lastChanged
+  if (storedVal && elapsed < QUOTE_INTERVAL_MS) {
+    currentQuote.value = storedVal
+    quoteTimer = setTimeout(advanceQuote, QUOTE_INTERVAL_MS - elapsed)
+  } else {
+    advanceQuote()
+  }
+}
 
 const route = useRoute()
 const sparrowId = computed(() => route.params.id as string)
@@ -307,14 +344,16 @@ const cycleTimestamps = computed(() => {
   return tempReadings.filter(r => parseRecordedAt(r.recorded_at).getTime() >= cutoff).map(r => r.recorded_at)
 })
 
-// Auto-refresh every 5 seconds, quote cycles every 20 seconds
+// Auto-refresh every 5 seconds
 let refreshTimer: ReturnType<typeof setInterval>
-let quoteTimer: ReturnType<typeof setInterval>
 onMounted(() => {
   refreshTimer = setInterval(() => { refresh(); refreshY() }, 5000)
-  quoteTimer = setInterval(() => { quoteIndex.value++ }, 20000)
+  initQuote()
 })
-onUnmounted(() => { clearInterval(refreshTimer); clearInterval(quoteTimer) })
+onUnmounted(() => {
+  clearInterval(refreshTimer)
+  if (quoteTimer) clearTimeout(quoteTimer)
+})
 </script>
 
 <template>
@@ -335,7 +374,7 @@ onUnmounted(() => { clearInterval(refreshTimer); clearInterval(quoteTimer) })
         <div>
           <div class="hans-hero-greeting hans-mono">{{ sparrowId }}</div>
           <h1 class="hans-hero-title">{{ sparrowId }}</h1>
-          <div class="hans-hero-sub">{{ sparrowMood }}</div>
+          <div class="hans-hero-sub">{{ currentQuote }}</div>
           <div class="hans-hero-tags">
             <span class="hans-chip">
               <span class="dot" :style="{ background: isOnline ? 'var(--leaf)' : 'var(--clay)' }"></span>
