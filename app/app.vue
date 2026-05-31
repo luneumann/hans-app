@@ -2,6 +2,13 @@
   <div>
     <NuxtRouteAnnouncer/>
 
+    <!-- Desktop cursor glow dot -->
+    <div
+      v-if="isPointerFine"
+      class="cursor-dot"
+      :style="{ transform: `translate(${dotX}px, ${dotY}px)` }"
+    />
+
     <!-- Intro splash (first visit only) -->
     <HansIntro v-if="showIntro" @done="onIntroDone"/>
 
@@ -76,4 +83,54 @@ function onIntroDone() {
   showIntro.value = false
   localStorage.setItem('hans-intro-seen', '1')
 }
+
+// Cursor glow dot — desktop only
+const isPointerFine = ref(false)
+const dotX = ref(-100)
+const dotY = ref(-100)
+let rafId: number | null = null
+
+onMounted(() => {
+  isPointerFine.value = window.matchMedia('(pointer: fine)').matches
+  if (!isPointerFine.value) return
+
+  let targetX = -100
+  let targetY = -100
+  let curX = -100
+  let curY = -100
+
+  window.addEventListener('mousemove', (e) => {
+    targetX = e.clientX - 10
+    targetY = e.clientY - 10
+  })
+
+  function animate() {
+    curX += (targetX - curX) * 0.12
+    curY += (targetY - curY) * 0.12
+    dotX.value = curX
+    dotY.value = curY
+    rafId = requestAnimationFrame(animate)
+  }
+  rafId = requestAnimationFrame(animate)
+})
+
+onUnmounted(() => {
+  if (rafId !== null) cancelAnimationFrame(rafId)
+})
 </script>
+
+<style scoped>
+.cursor-dot {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  pointer-events: none;
+  z-index: 9999;
+  background: radial-gradient(circle, rgba(220, 160, 20, 0.75) 0%, rgba(200, 130, 10, 0.35) 45%, transparent 75%);
+  will-change: transform;
+  mix-blend-mode: screen;
+}
+</style>
