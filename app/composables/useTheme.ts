@@ -5,8 +5,7 @@
  *
  * ─── How to tweak ────────────────────────────────────────────────────────────
  * To change a color:    edit a value in THEMES['forest-rose'].tokens
- * To shift the mascot:  edit THEMES['forest-rose'].mascot
- * To recolor the heatmap: edit comfortStops (OKLch L/C/h at each comfort level)
+ *To recolor the heatmap: edit comfortStops (OKLch L/C/h at each comfort level)
  * To recolor the aurora:  edit auroraStops (temperature → hue)
  *
  * To add a new theme:   add another entry to THEMES, then call setTheme('name').
@@ -28,21 +27,6 @@ export interface ThemeTokens {
   plum: string; plumSoft: string
 }
 
-export interface MascotPalette {
-  potTop: string
-  potBottom: string
-  potRim: string
-  potShadow: string
-  potStroke: string
-  stem: string
-  sundrop: string
-  glow: string
-  /** Hue at vitality=0 (low health) for the leaves */
-  leafBaseHue: number
-  /** How far the hue shifts as vitality goes to 100 */
-  leafHueShift: number
-}
-
 /** One stop on the heatmap comfort gradient. `at` is 0..1 (score / 100). */
 export interface ComfortStop {
   at: number
@@ -60,7 +44,6 @@ export interface AuroraStop {
 export interface Theme {
   name: string
   tokens: ThemeTokens
-  mascot: MascotPalette
   comfortStops: ComfortStop[]
   auroraStops: AuroraStop[]
 }
@@ -96,18 +79,6 @@ export const THEMES: Record<string, Theme> = {
       claySoft:  'rgba(224, 104, 88, 0.22)',
       plum:      '#8890b8',
       plumSoft:  'rgba(136, 144, 184, 0.22)',
-    },
-    mascot: {
-      potTop:    'oklch(0.66 0.12 12)',
-      potBottom: 'oklch(0.44 0.10 8)',
-      potRim:    'oklch(0.38 0.08 8)',
-      potShadow: 'oklch(0.24 0.04 10)',
-      potStroke: 'oklch(0.34 0.06 8)',
-      stem:      'oklch(0.48 0.12 150)',
-      sundrop:   'oklch(0.90 0.14 55)',
-      glow:      'oklch(0.90 0.20 155)',
-      leafBaseHue: 145,
-      leafHueShift: 15,
     },
     // Heatmap gradient: rose → lavender → sky → mint (skips ugly yellow-green zone)
     comfortStops: [
@@ -150,18 +121,6 @@ export const THEMES: Record<string, Theme> = {
       claySoft:  'oklch(0.86 0.16 350 / 0.22)',
       plum:      'oklch(0.86 0.16 310)',
       plumSoft:  'oklch(0.86 0.16 310 / 0.22)',
-    },
-    mascot: {
-      potTop:    'oklch(0.62 0.12 350)',
-      potBottom: 'oklch(0.42 0.10 345)',
-      potRim:    'oklch(0.36 0.08 345)',
-      potShadow: 'oklch(0.22 0.04 350)',
-      potStroke: 'oklch(0.32 0.06 345)',
-      stem:      'oklch(0.48 0.12 140)',
-      sundrop:   'oklch(0.90 0.16 65)',
-      glow:      'oklch(0.90 0.18 130)',
-      leafBaseHue: 130,
-      leafHueShift: 12,
     },
     comfortStops: [
       { at: 0.00, L: 0.50, C: 0.17, h: 350 },

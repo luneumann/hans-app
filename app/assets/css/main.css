@@ -471,10 +471,6 @@ body::before {
 
 /* Mascot sway — speed + amp controlled per-instance via --sway-speed / --sway-amp */
 .hans-mascot { --sway-speed: 4.5s; --sway-amp: 4deg; }
-.mascot-stem    { transform-origin: 80px 130px; animation: hans-sway var(--sway-speed) ease-in-out infinite; }
-.mascot-leaf-a  { transform-origin: 80px 90px;  animation: hans-sway var(--sway-speed) ease-in-out infinite; }
-.mascot-leaf-b  { transform-origin: 80px 90px;  animation: hans-sway calc(var(--sway-speed) * 1.15) ease-in-out infinite reverse; }
-.mascot-leaf-c  { transform-origin: 80px 90px;  animation: hans-sway calc(var(--sway-speed) * 1.33) ease-in-out infinite; animation-delay: -1s; }
 @keyframes hans-sway {
   0%, 100% { transform: rotate(calc(var(--sway-amp) * -1)); }
   50%      { transform: rotate(var(--sway-amp)); }
