@@ -351,7 +351,6 @@ onUnmounted(() => {
         </div>
         <div class="hans-hero-meta">
           <div class="hans-pill hans-mono">{{ dateStr }}</div>
-          <div class="hans-pill hans-mono">data · {{ selectedRange }} window</div>
         </div>
       </div>
     </div>

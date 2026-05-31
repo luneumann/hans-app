@@ -41,6 +41,7 @@
 }
 
 /* Base */
+html { overflow-x: hidden; }
 html, body { margin: 0; padding: 0; }
 body {
   font-family: var(--font-sans);
@@ -491,14 +492,14 @@ body::before {
   /* Page shell */
   .hans-page { padding: 16px 14px max(88px, calc(72px + env(safe-area-inset-bottom))); }
 
-  /* Top nav — simplified: hide subtitle, links, status */
+  /* Top nav — simplified: hide subtitle and links, keep status dot only */
   .hans-nav { padding: 10px 14px; }
   .hans-nav .brand-sub { display: none; }
   .hans-nav-links { display: none; }
-  .hans-nav-status { display: none; }
+  .hans-nav-status span:not(.dot) { display: none; }
 
-  /* Metric grid */
-  .hans-metrics-row { grid-template-columns: 1fr 1fr; }
+  /* Metric grid: 1 per row on mobile */
+  .hans-metrics-row { grid-template-columns: 1fr; }
 
   /* Sparrow list */
   .hans-sparrows { grid-template-columns: 1fr; }
@@ -507,6 +508,13 @@ body::before {
   .hans-hero-content { padding: 22px 18px 18px; min-height: unset; }
   .hans-hero-title { font-size: 26px; }
   .hans-hero-outside { font-size: 15px; }
+  .hans-hero-meta { flex-direction: row; justify-content: flex-start; align-items: center; gap: 8px; }
+  .hans-hero-tags { gap: 6px; }
+
+  /* Heatmap: prevent overflow, tighter gaps */
+  .hans-heatmap { --hm-label-col: 28px; --hm-col-gap: 2px; overflow: hidden; }
+  .hans-heatmap-foot { flex-direction: column; align-items: flex-start; gap: 6px; }
+  .hans-heatmap-legend .meta { display: none; }
 
   /* Bottom tab bar */
   .hans-bottom-nav {
