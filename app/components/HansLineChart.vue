@@ -1,9 +1,10 @@
 <template>
   <svg
+    ref="svgEl"
     class="hans-chart-svg"
     :viewBox="`0 0 ${W} ${H}`"
     preserveAspectRatio="none"
-    :style="{ height: height + 'px' }"
+    :style="{ height: height + 'px', width: '100%' }"
   >
     <!-- Y grid -->
     <g v-for="(v, i) in gridY" :key="i">
@@ -64,8 +65,18 @@ const props = defineProps<{
   height?: number
 }>()
 
-const W = 720
+const svgEl = ref<SVGSVGElement | null>(null)
+const W = ref(720)
 const H = computed(() => props.height ?? 200)
+
+onMounted(() => {
+  const ro = new ResizeObserver(entries => {
+    const w = entries[0]?.contentRect.width
+    if (w && w > 0) W.value = w
+  })
+  if (svgEl.value) ro.observe(svgEl.value)
+  onUnmounted(() => ro.disconnect())
+})
 const padL = 36, padR = 12, padT = 12, padB = 24
 
 const allValues = computed(() => Object.values(props.series).flat())
@@ -83,7 +94,7 @@ const maxVal = computed(() => {
 })
 
 function xFor(i: number, len: number) {
-  return padL + (i / (len - 1)) * (W - padL - padR)
+  return padL + (i / (len - 1)) * (W.value - padL - padR)
 }
 function yFor(v: number) {
   return padT + (1 - (v - minVal.value) / (maxVal.value - minVal.value)) * (H.value - padT - padB)
