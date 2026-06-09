@@ -81,11 +81,13 @@ export const THEMES: Record<string, Theme> = {
       plumSoft:  'rgba(136, 144, 184, 0.22)',
     },
     // Heatmap gradient: rot → salbei → tief blau → dunkelgrün
+    // Stops shifted so the 60-100 score range (where real data lives) has
+    // three distinct hue zones instead of blending into one teal blob.
     comfortStops: [
-      { at: 0.00, L: 0.75, C: 0.12, h: 25  },  // rot
-      { at: 0.33, L: 0.80, C: 0.07, h: 140 },  // salbei (muted grey-green)
-      { at: 0.66, L: 0.74, C: 0.12, h: 248 },  // tief blau
-      { at: 1.00, L: 0.64, C: 0.13, h: 155 },  // dunkelgrün
+      { at: 0.00, L: 0.68, C: 0.16, h: 25  },  // rot
+      { at: 0.48, L: 0.76, C: 0.11, h: 140 },  // salbei
+      { at: 0.74, L: 0.70, C: 0.16, h: 232 },  // tief blau
+      { at: 1.00, L: 0.72, C: 0.17, h: 148 },  // dunkelgrün
     ],
     // Aurora hue mapping by temperature
     auroraStops: [
@@ -124,10 +126,10 @@ export const THEMES: Record<string, Theme> = {
     },
     // Heatmap gradient: rot → salbei → tief blau → dunkelgrün
     comfortStops: [
-      { at: 0.00, L: 0.78, C: 0.12, h: 25  },  // rot
-      { at: 0.33, L: 0.83, C: 0.07, h: 140 },  // salbei (muted grey-green)
-      { at: 0.66, L: 0.78, C: 0.12, h: 248 },  // tief blau
-      { at: 1.00, L: 0.68, C: 0.13, h: 155 },  // dunkelgrün
+      { at: 0.00, L: 0.72, C: 0.16, h: 25  },  // rot
+      { at: 0.48, L: 0.80, C: 0.11, h: 140 },  // salbei
+      { at: 0.74, L: 0.76, C: 0.16, h: 232 },  // tief blau
+      { at: 1.00, L: 0.78, C: 0.17, h: 148 },  // dunkelgrün
     ],
     auroraStops: [
       { temp: 15, hue: 285 },
