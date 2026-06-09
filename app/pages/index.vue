@@ -73,7 +73,7 @@ const { data: yRows, refresh: refreshYesterday } = await useAsyncData<Reading[]>
 // Only temperature + humidity are needed for the comfort score — halves row count.
 // Limit set to 50 000: worst case ~3 sensors × 2 metrics × 1 reading/min × 7 d ≈ 30 240 rows.
 const heatmapSince = computed(() => new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString())
-const { data: weekRows, refresh: refreshWeek } = await useAsyncData<Reading[]>(
+const { data: weekRows, refresh: refreshWeek } = useAsyncData<Reading[]>(
   'week_readings',
   async () => {
     const { data, error } = await supabase
@@ -85,7 +85,8 @@ const { data: weekRows, refresh: refreshWeek } = await useAsyncData<Reading[]>(
       .limit(50000)
     if (error) throw error
     return ((data ?? []) as Reading[]).reverse()
-  }
+  },
+  { lazy: true }
 )
 
 const sparrows = computed(() =>
