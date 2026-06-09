@@ -70,6 +70,8 @@ const { data: yRows, refresh: refreshYesterday } = await useAsyncData<Reading[]>
 )
 
 // 7d data for heatmap (independent of selectedRange)
+// Only temperature + humidity are needed for the comfort score — halves row count.
+// Limit set to 50 000: worst case ~3 sensors × 2 metrics × 1 reading/min × 7 d ≈ 30 240 rows.
 const heatmapSince = computed(() => new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString())
 const { data: weekRows, refresh: refreshWeek } = await useAsyncData<Reading[]>(
   'week_readings',
@@ -78,8 +80,9 @@ const { data: weekRows, refresh: refreshWeek } = await useAsyncData<Reading[]>(
       .from('sensor_readings')
       .select('sparrow_id, metric, value, recorded_at')
       .gte('recorded_at', heatmapSince.value)
+      .in('metric', ['temperature', 'humidity'])
       .order('recorded_at', { ascending: false })
-      .limit(9997)
+      .limit(50000)
     if (error) throw error
     return ((data ?? []) as Reading[]).reverse()
   }
