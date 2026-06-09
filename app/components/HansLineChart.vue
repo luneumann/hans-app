@@ -105,10 +105,18 @@ const gridY = computed(() => {
   return Array.from({ length: ticks + 1 }, (_, i) => minVal.value + (i / ticks) * (maxVal.value - minVal.value))
 })
 
-const xLabels = computed(() => ({
-  '1h':  ['-60m', '-45m', '-30m', '-15m', 'now'],
-  '6h':  ['-6h', '-4h', '-2h', 'now'],
-  '24h': ['-24h', '-18h', '-12h', '-6h', 'now'],
-  '7d':  ['-7d', '-5d', '-3d', '-1d', 'now'],
-} as Record<string, string[]>)[props.range ?? '24h'] ?? ['-24h', '-18h', '-12h', '-6h', 'now'])
+const xLabels = computed(() => {
+  const now = new Date()
+  const hm  = (d: Date) => d.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })
+  const day = (d: Date) => d.toLocaleDateString('de-DE', { weekday: 'short', day: 'numeric', month: 'numeric' })
+  const sub = (h: number) => new Date(now.getTime() - h * 3_600_000)
+  const subD = (d: number) => new Date(now.getTime() - d * 86_400_000)
+
+  return ({
+    '1h':  [hm(sub(1)),  hm(sub(0.75)), hm(sub(0.5)), hm(sub(0.25)), hm(now)],
+    '6h':  [hm(sub(6)),  hm(sub(4)),    hm(sub(2)),   hm(now)],
+    '24h': [hm(sub(24)), hm(sub(18)),   hm(sub(12)),  hm(sub(6)),    hm(now)],
+    '7d':  [day(subD(7)), day(subD(5)), day(subD(3)), day(subD(1)),  day(now)],
+  } as Record<string, string[]>)[props.range ?? '24h'] ?? [hm(sub(24)), hm(sub(18)), hm(sub(12)), hm(sub(6)), hm(now)]
+})
 </script>
