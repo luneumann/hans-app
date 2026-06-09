@@ -14,9 +14,6 @@ export default defineNuxtConfig({
   css: ['~/assets/css/main.css'],
   compatibilityDate: '2025-07-15',
   devtools: { enabled: true },
-  routeRules: {
-    '/': { prerender: true },
-  },
   modules: ['@nuxtjs/supabase', '@nuxt/ui'],
   supabase: {
     redirectOptions: {

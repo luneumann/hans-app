@@ -1,6 +1,4 @@
 <script setup lang="ts">
-definePageMeta({ ssr: false })
-
 interface Reading {
   sparrow_id: string
   metric: string
