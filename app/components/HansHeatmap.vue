@@ -12,10 +12,26 @@
           class="hans-heatmap-cell"
           :class="{ now: cell.isNow }"
           :style="{ background: cell.color }"
-          :title="cell.title"
+          @mouseenter="onEnter(cell, $event)"
+          @mouseleave="onLeave"
         />
       </template>
     </div>
+
+    <!-- Custom tooltip -->
+    <Teleport to="body">
+      <div
+        v-if="tooltip.visible"
+        class="hans-heatmap-tooltip"
+        :style="{ left: tooltip.x + 'px', top: tooltip.y + 'px' }"
+      >
+        <span class="tt-time">{{ tooltip.time }}</span>
+        <span v-if="tooltip.score !== null" class="tt-score" :style="{ color: tooltip.color }">
+          {{ tooltip.score }}
+        </span>
+        <span v-else class="tt-nodata">no data</span>
+      </div>
+    </Teleport>
     <div class="hans-heatmap-foot">
       <div class="hans-heatmap-xaxis">
         <span
@@ -131,13 +147,13 @@ const rows = computed(() => {
   const result: Array<{
     dayIdx: number
     label: string
-    cells: Array<{ key: string; color: string; title: string; isNow: boolean }>
+    cells: Array<{ key: string; color: string; score: number | null; time: string; isNow: boolean }>
   }> = []
 
   for (let d = 0; d < DAYS.value; d++) {
     const daysBack = DAYS.value - 1 - d
     const label = dayLabelFor(daysBack)
-    const cells: Array<{ key: string; color: string; title: string; isNow: boolean }> = []
+    const cells: Array<{ key: string; color: string; score: number | null; time: string; isNow: boolean }> = []
     for (let h = 0; h < 24; h++) {
       const b = buckets.get(`${d}-${h}`)
       let score: number | null = null
@@ -151,9 +167,8 @@ const rows = computed(() => {
       cells.push({
         key: `${d}-${h}`,
         color: comfortColor(score, theme.value),
-        title: score !== null
-          ? `${label} ${String(h).padStart(2, '0')}:00 — comfort ${score}`
-          : `${label} ${String(h).padStart(2, '0')}:00 — no data`,
+        score,
+        time: `${label} ${String(h).padStart(2, '0')}:00`,
         isNow: d === nowDayIdx && h === nowHour,
       })
     }
@@ -161,6 +176,34 @@ const rows = computed(() => {
   }
   return result
 })
+
+// ── Tooltip ──────────────────────────────────────────────────────────────────
+const tooltip = reactive({
+  visible: false,
+  x: 0,
+  y: 0,
+  time: '',
+  score: null as number | null,
+  color: '',
+})
+
+function onEnter(cell: { score: number | null; time: string; color: string }, e: MouseEvent) {
+  tooltip.time  = cell.time
+  tooltip.score = cell.score
+  tooltip.color = cell.color
+  positionTooltip(e)
+  tooltip.visible = true
+}
+
+function onLeave() {
+  tooltip.visible = false
+}
+
+function positionTooltip(e: MouseEvent) {
+  const GAP = 10
+  tooltip.x = e.clientX + GAP
+  tooltip.y = e.clientY - 36
+}
 </script>
 
 <style>
@@ -272,5 +315,45 @@ const rows = computed(() => {
   }
   .hans-heatmap-legend .meta { display: none; }
   .hans-heatmap-xaxis { font-size: 9px; }
+}
+
+/* ── Tooltip (teleported to body) ── */
+.hans-heatmap-tooltip {
+  position: fixed;
+  z-index: 9000;
+  pointer-events: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 7px 11px;
+  border-radius: 9px;
+  background: var(--panel-2, #222840);
+  border: 1px solid var(--line-soft, #353c60);
+  box-shadow: 0 6px 20px oklch(0 0 0 / 0.45);
+  backdrop-filter: blur(8px);
+  transform: translateX(-50%);
+}
+.hans-heatmap-tooltip .tt-time {
+  font-family: var(--font-chart);
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-3, #8890b8);
+  white-space: nowrap;
+}
+.hans-heatmap-tooltip .tt-score {
+  font-family: var(--font-mono);
+  font-size: 18px;
+  font-weight: 500;
+  letter-spacing: -0.03em;
+  line-height: 1;
+  font-feature-settings: 'tnum' 1;
+}
+.hans-heatmap-tooltip .tt-nodata {
+  font-size: 11px;
+  color: var(--ink-4, #6870a0);
+  font-style: italic;
 }
 </style>
