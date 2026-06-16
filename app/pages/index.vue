@@ -177,6 +177,40 @@ function isOnlineSparrow(id: string): boolean {
 }
 const onlineCount = computed(() => sparrows.value.filter(isOnlineSparrow).length)
 
+// Mobile breakpoint flag (drives carousel + average-only charts)
+const isMobile = useIsMobile()
+
+// Share online/total with the top nav (app.vue) so it can show a compact count
+const navStatus = useState('hans-nav-status', () => ({ online: 0, total: 0 }))
+watchEffect(() => {
+  navStatus.value = { online: onlineCount.value, total: sparrows.value.length }
+})
+
+// Per-sparrow comfort score (same formula as the heatmap / detail page)
+function sparrowComfort(s: string): number | null {
+  const T = latestValue(s, 'temperature')
+  const RH = latestValue(s, 'humidity')
+  if (T === null || RH === null) return null
+  return Math.round(Math.max(0, Math.min(100, 100 - Math.abs(T - 21) * 4 - Math.abs(RH - 50) * 0.5)))
+}
+
+// Mobile drill-down: tapping a sparrow opens a summary bottom sheet instead
+// of navigating straight to the full detail page.
+const sheetOpen = ref(false)
+const activeSparrow = ref<string | null>(null)
+function onSparrowClick(e: MouseEvent, s: string) {
+  if (isMobile.value) {
+    e.preventDefault()
+    activeSparrow.value = s
+    sheetOpen.value = true
+  }
+}
+function openFullView() {
+  const s = activeSparrow.value
+  sheetOpen.value = false
+  if (s) navigateTo(`/sensors/${s}`)
+}
+
 // Sparrow's cycle timestamps for pulse strip (1h window of temperature readings)
 function sparrowCycleTimestamps(id: string): string[] {
   const readings = byGroup.value.get(id)?.get('temperature') ?? []
@@ -433,7 +467,7 @@ onUnmounted(() => {
           >{{ r }}</button>
         </div>
       </div>
-      <div class="hans-charts">
+      <HansChartCarousel :count="METRICS.length">
         <div v-for="m in METRICS" :key="m.id" class="hans-card hans-chart-card">
           <div class="hans-chart-head">
             <div class="label">
@@ -445,21 +479,28 @@ onUnmounted(() => {
             </div>
           </div>
           <HansLineChart
-            :series="sparrowSeries(m.id)"
-            :line-colors="Object.fromEntries(sparrows.map((s, i) => [s, sparrowColor(i)]))"
+            :series="isMobile ? { average: aggSeries(m.id) } : sparrowSeries(m.id)"
+            :line-colors="isMobile ? { average: m.color } : Object.fromEntries(sparrows.map((s, i) => [s, sparrowColor(i)]))"
             :default-color="m.color"
             :decimals="m.decimals"
             :range="selectedRange"
             :height="170"
           />
-          <div class="hans-legend">
+          <!-- Desktop: full per-sparrow legend. Mobile: single average caption. -->
+          <div v-if="!isMobile" class="hans-legend">
             <div v-for="(s, i) in sparrows" :key="s" class="hans-legend-item">
               <span class="dot" :style="{ background: sparrowColor(i) }"></span>
               {{ s }}
             </div>
           </div>
+          <div v-else class="hans-legend">
+            <div class="hans-legend-item">
+              <span class="dot" :style="{ background: m.color }"></span>
+              Ø alle Sparrows · {{ sparrows.length }}
+            </div>
+          </div>
         </div>
-      </div>
+      </HansChartCarousel>
 
       <!-- 7d COMFORT RHYTHM -->
       <div class="hans-section-head">
@@ -481,6 +522,7 @@ onUnmounted(() => {
           :key="s"
           :to="`/sensors/${s}`"
           style="text-decoration:none"
+          @click="onSparrowClick($event, s)"
         >
           <div class="hans-sparrow">
             <div class="thumb" :style="{ backgroundImage: `url(${sparrowImage(s)})` }"></div>
@@ -513,6 +555,41 @@ onUnmounted(() => {
       </div>
 
     </template>
+
+    <!-- Mobile drill-down summary -->
+    <HansBottomSheet v-model="sheetOpen">
+      <template v-if="activeSparrow">
+        <div class="hans-sheet-head">
+          <div>
+            <div class="hans-sheet-eyebrow hans-mono">sparrow</div>
+            <div class="hans-sheet-title">{{ activeSparrow }}</div>
+          </div>
+          <div class="sparrow-status">
+            <span class="dot" :style="{ background: isOnlineSparrow(activeSparrow) ? 'var(--leaf)' : 'var(--clay)' }"></span>
+            <span>{{ isOnlineSparrow(activeSparrow) ? 'online' : 'offline' }}</span>
+          </div>
+        </div>
+
+        <div class="hans-sheet-metrics">
+          <div v-for="m in METRICS" :key="m.id" class="hans-sheet-metric">
+            <span class="k">{{ m.name }}</span>
+            <span class="v hans-mono">
+              {{ latestValue(activeSparrow, m.id) !== null ? (m.decimals === 0 ? Math.round(latestValue(activeSparrow, m.id)!) : latestValue(activeSparrow, m.id)!.toFixed(m.decimals)) : '—' }}<small>{{ m.unit }}</small>
+            </span>
+          </div>
+        </div>
+
+        <div v-if="sparrowComfort(activeSparrow) !== null" class="hans-sheet-comfort">
+          <span>Komfort</span>
+          <strong class="hans-mono">{{ sparrowComfort(activeSparrow) }} / 100</strong>
+        </div>
+
+        <button type="button" class="hans-sheet-cta" @click="openFullView">
+          Vollständige Ansicht öffnen
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>
+        </button>
+      </template>
+    </HansBottomSheet>
   </div>
 </template>
 

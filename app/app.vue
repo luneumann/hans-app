@@ -42,7 +42,8 @@
           </div>
           <div class="hans-nav-status">
             <span class="dot"></span>
-            <span>sparrows online</span>
+            <span v-if="navStatus.total" class="nav-count">{{ navStatus.online }}/{{ navStatus.total }}</span>
+            <span class="nav-label">sparrows online</span>
           </div>
         </div>
       </nav>
@@ -80,6 +81,10 @@
 
 <script setup lang="ts">
 const route = useRoute()
+
+// Online/total count published by the dashboard; shown compactly in the
+// mobile top nav next to the status dot.
+const navStatus = useState('hans-nav-status', () => ({ online: 0, total: 0 }))
 
 const showIntro = ref(false)
 

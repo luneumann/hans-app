@@ -409,8 +409,9 @@ onUnmounted(() => {
     </div>
 
     <div class="hans-detail-grid">
-      <div>
+      <div class="hans-detail-main">
         <!-- CURRENT METRICS -->
+        <div class="hans-detail-now">
         <div class="hans-section-head" style="margin-top:0">
           <h2>Now · {{ sparrowId }}</h2>
           <div class="hans-range">
@@ -435,13 +436,16 @@ onUnmounted(() => {
             :range-label="`last ${selectedRange}`"
           />
         </div>
+        </div>
+        <!-- /.hans-detail-now -->
 
         <!-- CHARTS GRID -->
+        <div class="hans-detail-history">
         <div class="hans-section-head">
           <h2>History · {{ selectedRange }}</h2>
           <span class="meta">sample interval · {{ SAMPLE_INTERVAL[selectedRange] }}</span>
         </div>
-        <div class="hans-charts">
+        <HansChartCarousel :count="METRICS.length">
           <div v-for="m in METRICS" :key="m.id" class="hans-card hans-chart-card">
             <div class="hans-chart-head">
               <div class="label">
@@ -462,7 +466,9 @@ onUnmounted(() => {
               :height="160"
             />
           </div>
+        </HansChartCarousel>
         </div>
+        <!-- /.hans-detail-history -->
       </div>
 
       <!-- SIDE PANEL -->

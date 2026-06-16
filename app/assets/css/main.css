@@ -120,6 +120,7 @@ body::before {
 .hans-nav-link.active { color: var(--ink); background: color-mix(in oklab, var(--leaf) 12%, transparent); border-color: color-mix(in oklab, var(--leaf) 22%, transparent); }
 .hans-nav-right { display: flex; align-items: center; gap: 14px; }
 .hans-nav-status { display: inline-flex; align-items: center; gap: 8px; font-size: 12px; color: var(--ink-3); }
+.hans-nav-status .nav-count { display: none; font-family: 'Geist Mono', monospace; font-size: 12px; color: var(--ink-3); }
 .hans-nav-status .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--leaf); box-shadow: 0 0 8px var(--leaf); animation: hans-pulse 2s ease-in-out infinite; }
 
 @keyframes hans-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.45; } }
@@ -368,6 +369,74 @@ body::before {
 .hans-legend-item { display: inline-flex; align-items: center; gap: 7px; font-size: 11px; color: var(--ink-3); }
 .hans-legend-item .dot { width: 8px; height: 8px; border-radius: 2px; }
 
+/* Chart carousel — inert on desktop (cards stay in their grid); the dots
+   and scroll-snap behaviour switch on at ≤640px. */
+.hans-carousel { width: 100%; min-width: 0; }
+.hans-carousel-dots { display: none; }
+
+/* ── Bottom-sheet content (drill-down summary) ── */
+.hans-sheet-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 18px;
+}
+.hans-sheet-eyebrow { font-size: 11px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--ink-3); }
+.hans-sheet-title { font-size: 24px; letter-spacing: -0.02em; color: var(--ink); margin-top: 2px; text-transform: capitalize; }
+.hans-sheet-head .sparrow-status { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--ink-3); white-space: nowrap; }
+.hans-sheet-head .sparrow-status .dot { width: 7px; height: 7px; border-radius: 50%; }
+.hans-sheet-metrics {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+.hans-sheet-metric {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 14px;
+  border-radius: var(--r-md);
+  border: 1px solid var(--line-soft);
+  background: var(--panel);
+}
+.hans-sheet-metric .k { font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink-4); }
+.hans-sheet-metric .v { font-size: 22px; letter-spacing: -0.02em; color: var(--ink); }
+.hans-sheet-metric .v small { font-size: 12px; color: var(--ink-3); margin-left: 2px; }
+.hans-sheet-comfort {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px;
+  border-radius: var(--r-md);
+  border: 1px solid var(--line-soft);
+  background: var(--panel);
+  margin-bottom: 18px;
+  font-size: 13px;
+  color: var(--ink-3);
+}
+.hans-sheet-comfort strong { font-size: 16px; color: var(--ink); }
+.hans-sheet-cta {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 15px;
+  border: 0;
+  border-radius: var(--r-md);
+  background: var(--accent-green);
+  color: #0c1a10;
+  font-family: 'Geist', inherit;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.hans-sheet-cta svg { width: 16px; height: 16px; }
+.hans-sheet-cta:active { transform: scale(0.99); }
+
 /* ── Sparrow grid ── */
 .hans-sparrows { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
 .hans-sparrow {
@@ -505,7 +574,7 @@ body::before {
   .hans-nav { padding: 10px 14px; }
   .hans-nav .brand-sub { display: none; }
   .hans-nav-links { display: none; }
-  .hans-nav-status span:not(.dot) { display: none; }
+  .hans-nav-status .nav-label { display: none; }
 
   /* Metric grid: 1 per row on mobile */
   .hans-metrics-row { grid-template-columns: 1fr; }
@@ -528,6 +597,85 @@ body::before {
   .hans-heatmap { --hm-label-col: 28px; --hm-col-gap: 2px; overflow: hidden; }
   .hans-heatmap-foot { flex-direction: column; align-items: flex-start; gap: 6px; }
   .hans-heatmap-legend .meta { display: none; }
+
+  /* Section heads: stack title above its control so the range selector
+     can span full width instead of being squeezed beside the title. */
+  .hans-section-head {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+    margin: 26px 2px 14px;
+  }
+
+  /* Range selector → full-width segmented control with finger-sized targets */
+  .hans-range {
+    display: flex;
+    width: 100%;
+    padding: 4px;
+    border-radius: 14px;
+  }
+  .hans-range button {
+    flex: 1;
+    padding: 11px 0;
+    border-radius: 11px;
+    font-size: 13px;
+    letter-spacing: 0.04em;
+  }
+
+  /* Top-nav: show a compact online count beside the status dot */
+  .hans-nav-status .nav-count { display: inline-block; }
+
+  /* Detail page: surface the Device/status panel between the current
+     readings and the charts, so key glance-info isn't buried under 4 charts.
+     display:contents dissolves the main wrapper so its two halves can be
+     re-ordered around the side panel. */
+  .hans-detail-grid { display: flex; flex-direction: column; }
+  .hans-detail-main { display: contents; }
+  /* min-width:0 stops the carousel's scroll-width from forcing these flex
+     items wider than the viewport (flexbox min-width:auto default). */
+  .hans-detail-now { order: 1; min-width: 0; }
+  .hans-detail-side { order: 2; margin-top: 8px; min-width: 0; }
+  .hans-detail-history { order: 3; min-width: 0; }
+
+  /* Chart carousel: one card per view, native horizontal swipe + snap.
+     Overrides the grid (higher specificity via the .hans-carousel-track class). */
+  .hans-charts.hans-carousel-track {
+    display: flex;
+    grid-template-columns: none;
+    gap: 12px;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    scroll-behavior: smooth;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+  .hans-charts.hans-carousel-track::-webkit-scrollbar { display: none; }
+  .hans-charts.hans-carousel-track > * {
+    flex: 0 0 100%;
+    min-width: 0;
+    scroll-snap-align: start;
+  }
+  .hans-carousel-dots {
+    display: flex;
+    justify-content: center;
+    gap: 7px;
+    margin-top: 14px;
+  }
+  .hans-carousel-dots button {
+    width: 7px; height: 7px;
+    padding: 0; border: 0;
+    border-radius: 50%;
+    background: var(--ink-4);
+    opacity: 0.35;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+    transition: opacity 0.2s, transform 0.2s, background 0.2s;
+  }
+  .hans-carousel-dots button.active {
+    opacity: 1;
+    background: var(--ink-2);
+    transform: scale(1.3);
+  }
 
   /* Bottom tab bar */
   .hans-bottom-nav {
