@@ -496,7 +496,7 @@ onUnmounted(() => {
           <div v-else class="hans-legend">
             <div class="hans-legend-item">
               <span class="dot" :style="{ background: m.color }"></span>
-              Ø alle Sparrows · {{ sparrows.length }}
+              avg · all {{ sparrows.length }} sparrows
             </div>
           </div>
         </div>
@@ -580,12 +580,12 @@ onUnmounted(() => {
         </div>
 
         <div v-if="sparrowComfort(activeSparrow) !== null" class="hans-sheet-comfort">
-          <span>Komfort</span>
+          <span>Comfort</span>
           <strong class="hans-mono">{{ sparrowComfort(activeSparrow) }} / 100</strong>
         </div>
 
         <button type="button" class="hans-sheet-cta" @click="openFullView">
-          Vollständige Ansicht öffnen
+          Open full view
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>
         </button>
       </template>
