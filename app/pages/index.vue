@@ -147,14 +147,31 @@ function timeSeries(sparrowId: string, metricId: string, points = 60): number[] 
   return sampled
 }
 
-function aggSeries(metricId: string): number[] {
-  const series = sparrows.value.map(s => timeSeries(s, metricId))
+function aggSeriesFor(metricId: string, ids: string[]): number[] {
+  const series = ids.map(s => timeSeries(s, metricId)).filter(s => s.length)
   const len = Math.max(...series.map(s => s.length), 0)
   if (!len) return []
   return Array.from({ length: len }, (_, i) => {
     const vals = series.map(s => s[Math.round((i / (len - 1)) * (s.length - 1)) || 0]).filter(Boolean)
     return vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : 0
   })
+}
+function aggSeries(metricId: string): number[] {
+  return aggSeriesFor(metricId, sparrows.value)
+}
+
+// Mobile charts: indoor average vs. outdoor (balcony) as separate lines —
+// outdoor conditions read very differently and shouldn't be averaged in.
+function mobileSeries(metricId: string): Record<string, number[]> {
+  const out: Record<string, number[]> = {}
+  const indoor = aggSeriesFor(metricId, indoorSparrows.value)
+  if (indoor.length) out.indoor = indoor
+  const outdoor = aggSeriesFor(metricId, outdoorSparrows.value)
+  if (outdoor.length) out.outdoor = outdoor
+  return out
+}
+function mobileColors(metricColor: string): Record<string, string> {
+  return { indoor: metricColor, outdoor: 'var(--ink-3)' }
 }
 
 function sparrowSeries(metricId: string): Record<string, number[]> {
@@ -200,7 +217,10 @@ const sheetOpen = ref(false)
 const activeSparrow = ref<string | null>(null)
 function onSparrowClick(e: MouseEvent, s: string) {
   if (isMobile.value) {
+    // Capture-phase + stopImmediatePropagation so NuxtLink's own click
+    // handler never runs and the router doesn't navigate away.
     e.preventDefault()
+    e.stopImmediatePropagation()
     activeSparrow.value = s
     sheetOpen.value = true
   }
@@ -479,14 +499,14 @@ onUnmounted(() => {
             </div>
           </div>
           <HansLineChart
-            :series="isMobile ? { average: aggSeries(m.id) } : sparrowSeries(m.id)"
-            :line-colors="isMobile ? { average: m.color } : Object.fromEntries(sparrows.map((s, i) => [s, sparrowColor(i)]))"
+            :series="isMobile ? mobileSeries(m.id) : sparrowSeries(m.id)"
+            :line-colors="isMobile ? mobileColors(m.color) : Object.fromEntries(sparrows.map((s, i) => [s, sparrowColor(i)]))"
             :default-color="m.color"
             :decimals="m.decimals"
             :range="selectedRange"
             :height="170"
           />
-          <!-- Desktop: full per-sparrow legend. Mobile: single average caption. -->
+          <!-- Desktop: full per-sparrow legend. Mobile: indoor vs outdoor. -->
           <div v-if="!isMobile" class="hans-legend">
             <div v-for="(s, i) in sparrows" :key="s" class="hans-legend-item">
               <span class="dot" :style="{ background: sparrowColor(i) }"></span>
@@ -496,7 +516,11 @@ onUnmounted(() => {
           <div v-else class="hans-legend">
             <div class="hans-legend-item">
               <span class="dot" :style="{ background: m.color }"></span>
-              avg · all {{ sparrows.length }} sparrows
+              indoor avg · {{ indoorSparrows.length }}
+            </div>
+            <div v-if="outdoorSparrows.length" class="hans-legend-item">
+              <span class="dot" style="background: var(--ink-3)"></span>
+              outdoor
             </div>
           </div>
         </div>
@@ -522,7 +546,7 @@ onUnmounted(() => {
           :key="s"
           :to="`/sensors/${s}`"
           style="text-decoration:none"
-          @click="onSparrowClick($event, s)"
+          @click.capture="onSparrowClick($event, s)"
         >
           <div class="hans-sparrow">
             <div class="thumb" :style="{ backgroundImage: `url(${sparrowImage(s)})` }"></div>
