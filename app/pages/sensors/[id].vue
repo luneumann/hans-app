@@ -248,17 +248,13 @@ const dataHealth = computed(() => {
   }
 })
 
-// Dew point via Magnus approximation
-const dewPoint = computed(() => {
-  const T = latestValue('temperature')
-  const RH = latestValue('humidity')
-  if (T === null || RH === null) return null
-  return +(T - (100 - RH) / 5).toFixed(1)
-})
+// Dew point via Magnus formula (shared util)
+const dewPointVal = computed(() => dewPoint(latestValue('temperature'), latestValue('humidity')))
+const dewLabel = computed(() => dewPointLabel(dewPointVal.value))
 
 // How close is the current temperature to the dew point
 const condensationRisk = computed(() => {
-  const dp = dewPoint.value
+  const dp = dewPointVal.value
   const T = latestValue('temperature')
   if (dp === null || T === null) return null
   const gap = T - dp
@@ -293,15 +289,15 @@ const tempStability = computed(() => {
   return { sd, label: 'volatile' }
 })
 
-// Comfort score: distance from ideal 21°C / 50% RH
-const comfortScore = computed(() => {
-  const T = latestValue('temperature')
-  const RH = latestValue('humidity')
-  if (T === null || RH === null) return null
-  return Math.round(Math.max(0, Math.min(100,
-    100 - Math.abs(T - 21) * 4 - Math.abs(RH - 50) * 0.5
-  )))
-})
+// Whether this sensor is outdoors (balcony) — judged differently
+const isOutdoor = computed(() => isOutdoorSparrow(sparrowId.value))
+
+// Indoor comfort (ASHRAE) — score + verdict label
+const roomComfort = computed(() => comfortScore(latestValue('temperature'), latestValue('humidity')))
+const roomComfortLabel = computed(() => comfortLabel(latestValue('temperature'), latestValue('humidity')))
+
+// Outdoor apparent temperature ("feels like")
+const roomFeelsLike = computed(() => feelsLike(latestValue('temperature'), latestValue('humidity')))
 
 // Real events derived from sensor data
 const recentEvents = computed(() => {
@@ -507,17 +503,17 @@ onUnmounted(() => {
           <h3 class="panel-h">Dew point</h3>
           <div style="display:flex;align-items:baseline;gap:8px;margin-bottom:6px">
             <div class="hans-mono" style="font-size:32px;letter-spacing:-0.04em">
-              {{ dewPoint !== null ? `${dewPoint}°` : '—' }}
+              {{ dewPointVal !== null ? `${dewPointVal}°` : '—' }}
             </div>
-            <div style="color:var(--ink-3);font-size:12px">C</div>
+            <div style="color:var(--ink-3);font-size:12px">C · {{ dewLabel.text }}</div>
           </div>
           <div v-if="condensationRisk" style="display:flex;align-items:center;gap:6px;font-size:12px">
             <span class="dot" :style="{ background: condensationRisk.color }"></span>
             <span style="color:var(--ink-2)">Condensation risk: <strong>{{ condensationRisk.label }}</strong></span>
           </div>
           <div style="color:var(--ink-4);font-size:11px;margin-top:6px">
-            {{ dewPoint !== null && latestValue('temperature') !== null
-              ? `${(latestValue('temperature')! - dewPoint).toFixed(1)}° margin to surface condensation`
+            {{ dewPointVal !== null && latestValue('temperature') !== null
+              ? `${(latestValue('temperature')! - dewPointVal).toFixed(1)}° margin to surface condensation`
               : 'Calculated from temperature and humidity.' }}
           </div>
         </div>
@@ -546,15 +542,27 @@ onUnmounted(() => {
         <div class="hans-card" style="margin-top:16px">
           <h3 class="panel-h">Environment</h3>
           <div class="hans-kv">
-            <div class="k">Comfort</div>
-            <div class="v hans-mono">{{ comfortScore !== null ? `${comfortScore} / 100` : '—' }}</div>
+            <template v-if="isOutdoor">
+              <div class="k">Feels like</div>
+              <div class="v hans-mono">{{ roomFeelsLike !== null ? `${roomFeelsLike} °C` : '—' }}</div>
+              <div class="k">Air</div>
+              <div class="v hans-mono">{{ dewLabel.text }}</div>
+            </template>
+            <template v-else>
+              <div class="k">Comfort</div>
+              <div class="v hans-mono">{{ roomComfort !== null ? `${roomComfort} / 100` : '—' }}</div>
+              <div class="k">Verdict</div>
+              <div class="v hans-mono">{{ roomComfortLabel.text }}</div>
+            </template>
             <div class="k">Stability</div>
             <div class="v hans-mono">{{ tempStability ? tempStability.label : '—' }}</div>
             <div class="k">Temp σ</div>
             <div class="v hans-mono">{{ tempStability ? `±${tempStability.sd} °C` : '—' }}</div>
           </div>
           <div style="color:var(--ink-4);font-size:11px;margin-top:8px">
-            Comfort targets 21 °C / 50 % RH. Stability is σ of temperature over {{ selectedRange }}.
+            {{ isOutdoor
+              ? 'Outdoor reading — apparent temperature and air feel, not indoor comfort.'
+              : `Indoor comfort zone: 20–24 °C, 30–60 % RH (ASHRAE). Stability is σ of temperature over ${selectedRange}.` }}
           </div>
         </div>
 

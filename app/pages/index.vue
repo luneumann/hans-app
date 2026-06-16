@@ -203,13 +203,26 @@ watchEffect(() => {
   navStatus.value = { online: onlineCount.value, total: sparrows.value.length }
 })
 
-// Per-sparrow comfort score (same formula as the heatmap / detail page)
+// Per-sparrow comfort score (ASHRAE) and verdict label
 function sparrowComfort(s: string): number | null {
-  const T = latestValue(s, 'temperature')
-  const RH = latestValue(s, 'humidity')
-  if (T === null || RH === null) return null
-  return Math.round(Math.max(0, Math.min(100, 100 - Math.abs(T - 21) * 4 - Math.abs(RH - 50) * 0.5)))
+  return comfortScore(latestValue(s, 'temperature'), latestValue(s, 'humidity'))
 }
+function sparrowComfortLabel(s: string) {
+  return comfortLabel(latestValue(s, 'temperature'), latestValue(s, 'humidity'))
+}
+// Outdoor "feels like" + dew-point label for the balcony
+function sparrowFeelsLike(s: string): number | null {
+  return feelsLike(latestValue(s, 'temperature'), latestValue(s, 'humidity'))
+}
+function sparrowDewLabel(s: string) {
+  return dewPointLabel(dewPoint(latestValue(s, 'temperature'), latestValue(s, 'humidity')))
+}
+
+// Comfort heatmap is indoor-only — outdoor (balcony) readings would otherwise
+// drag the house comfort picture around.
+const indoorWeekRows = computed(() =>
+  (weekRows.value ?? []).filter(r => !isOutdoor(r.sparrow_id))
+)
 
 // Mobile drill-down: tapping a sparrow opens a summary bottom sheet instead
 // of navigating straight to the full detail page.
@@ -301,15 +314,10 @@ const theme = useTheme()
 const auroraHue = computed(() => auroraHueFor(houseAvg('temperature'), theme.value))
 const auroraHue2 = computed(() => (auroraHue.value + 50 + 360) % 360)
 
-// Mascot vitality: comfort score of house
-const mascotVitality = computed(() => {
-  const T = houseAvg('temperature')
-  const RH = houseAvg('humidity')
-  if (T === null || RH === null) return 50
-  return Math.round(Math.max(0, Math.min(100,
-    100 - Math.abs(T - 21) * 4 - Math.abs(RH - 50) * 0.5
-  )))
-})
+// Mascot vitality: ASHRAE comfort score of the indoor house average
+const mascotVitality = computed(() =>
+  comfortScore(houseAvg('temperature'), houseAvg('humidity')) ?? 50
+)
 const mascotMood = computed(() => {
   const v = mascotVitality.value
   if (v < 35) return 'Resting'
@@ -529,10 +537,10 @@ onUnmounted(() => {
       <!-- 7d COMFORT RHYTHM -->
       <div class="hans-section-head">
         <h2>Rhythm · last 7 days</h2>
-        <span class="meta">hourly comfort score</span>
+        <span class="meta">indoor comfort · hourly</span>
       </div>
       <div class="hans-card">
-        <HansHeatmap :readings="weekRows ?? []" :days="7"/>
+        <HansHeatmap :readings="indoorWeekRows" :days="7"/>
       </div>
 
       <!-- SPARROWS -->
@@ -603,8 +611,13 @@ onUnmounted(() => {
           </div>
         </div>
 
-        <div v-if="sparrowComfort(activeSparrow) !== null" class="hans-sheet-comfort">
-          <span>Comfort</span>
+        <!-- Outdoor (balcony): feels-like + air-feel, not indoor comfort -->
+        <div v-if="isOutdoor(activeSparrow)" class="hans-sheet-comfort">
+          <span>Feels like</span>
+          <strong class="hans-mono">{{ sparrowFeelsLike(activeSparrow) !== null ? `${sparrowFeelsLike(activeSparrow)}°` : '—' }} · {{ sparrowDewLabel(activeSparrow).text }}</strong>
+        </div>
+        <div v-else-if="sparrowComfort(activeSparrow) !== null" class="hans-sheet-comfort">
+          <span>Comfort · {{ sparrowComfortLabel(activeSparrow).text }}</span>
           <strong class="hans-mono">{{ sparrowComfort(activeSparrow) }} / 100</strong>
         </div>
 

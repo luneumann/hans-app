@@ -160,9 +160,7 @@ const rows = computed(() => {
       if (b && b.temps.length && b.hums.length) {
         const T = b.temps.reduce((a, x) => a + x, 0) / b.temps.length
         const RH = b.hums.reduce((a, x) => a + x, 0) / b.hums.length
-        score = Math.round(Math.max(0, Math.min(100,
-          100 - Math.abs(T - 21) * 4 - Math.abs(RH - 50) * 0.5
-        )))
+        score = comfortScore(T, RH)
       }
       cells.push({
         key: `${d}-${h}`,
