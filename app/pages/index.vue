@@ -174,6 +174,19 @@ function mobileColors(metricColor: string): Record<string, string> {
   return { indoor: metricColor, outdoor: 'var(--ink-3)' }
 }
 
+// Current value vs. yesterday for the merged mobile chart cards
+function metricYesterday(m: { id: string; unit: string; decimals: number }) {
+  const cur = houseAvg(m.id)
+  const y = yesterdayAvg(m.id)
+  if (cur === null || y === null) return null
+  const d = cur - y
+  const eps = m.decimals === 0 ? 0.5 : 0.1
+  const cls = d > eps ? 'up' : d < -eps ? 'down' : 'flat'
+  const sign = d > 0 ? '+' : d < 0 ? '−' : '±'
+  const v = m.decimals === 0 ? Math.round(Math.abs(d)) : Math.abs(d).toFixed(1)
+  return { cls, text: `${sign}${v}${m.unit} vs yesterday` }
+}
+
 function sparrowSeries(metricId: string): Record<string, number[]> {
   const out: Record<string, number[]> = {}
   for (const id of sparrows.value) {
@@ -464,28 +477,31 @@ onUnmounted(() => {
         </div>
       </div>
 
-      <!-- METRICS -->
-      <div class="hans-section-head">
-        <h2>Current ambient · house average</h2>
-        <span class="meta">across {{ sparrows.length }} sparrows</span>
-      </div>
-      <div class="hans-metrics-row">
-        <HansMetricCard
-          v-for="m in METRICS"
-          :key="m.id"
-          :metric="m"
-          :value="houseAvg(m.id) ?? 0"
-          :trend="avgTrend(m.id)"
-          :spark-data="aggSeries(m.id)"
-          :yesterday-value="yesterdayAvg(m.id)"
-          label="avg · all sparrows"
-          :range-label="`last ${selectedRange}`"
-        />
-      </div>
+      <!-- METRICS — desktop only; on mobile the current value is merged into
+           each trend card below to avoid showing the same metrics twice. -->
+      <template v-if="!isMobile">
+        <div class="hans-section-head">
+          <h2>Current ambient · house average</h2>
+          <span class="meta">indoor · {{ indoorSparrows.length }} sparrow{{ indoorSparrows.length !== 1 ? 's' : '' }}</span>
+        </div>
+        <div class="hans-metrics-row">
+          <HansMetricCard
+            v-for="m in METRICS"
+            :key="m.id"
+            :metric="m"
+            :value="houseAvg(m.id) ?? 0"
+            :trend="avgTrend(m.id)"
+            :spark-data="aggSeries(m.id)"
+            :yesterday-value="yesterdayAvg(m.id)"
+            label="avg · all sparrows"
+            :range-label="`last ${selectedRange}`"
+          />
+        </div>
+      </template>
 
-      <!-- CHARTS -->
+      <!-- CHARTS (mobile: current value + trend merged into one card) -->
       <div class="hans-section-head">
-        <h2>Trends · all sparrows</h2>
+        <h2>{{ isMobile ? 'Ambient · indoor average' : 'Trends · all sparrows' }}</h2>
         <div class="hans-range">
           <button
             v-for="r in RANGES"
@@ -505,6 +521,15 @@ onUnmounted(() => {
             <div class="range-mini">
               <span>{{ selectedRange }}</span>
             </div>
+          </div>
+          <!-- Mobile: current house average + vs-yesterday, merged in here -->
+          <div v-if="isMobile" class="hans-chart-now">
+            <span class="now-val hans-mono">
+              <AnimatedNumber :value="houseAvg(m.id) ?? 0" :decimals="m.decimals"/><small>{{ m.unit }}</small>
+            </span>
+            <span v-if="metricYesterday(m)" class="now-delta" :class="metricYesterday(m)!.cls">
+              {{ metricYesterday(m)!.text }}
+            </span>
           </div>
           <HansLineChart
             :series="isMobile ? mobileSeries(m.id) : sparrowSeries(m.id)"

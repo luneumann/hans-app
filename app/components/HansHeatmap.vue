@@ -35,16 +35,16 @@
     <div class="hans-heatmap-foot">
       <div class="hans-heatmap-xaxis">
         <span
-          v-for="h in [0, 6, 12, 18]"
-          :key="h"
-          :style="{ left: ((h + 0.5) / 24 * 100) + '%' }"
-        >{{ String(h).padStart(2, '0') }}:00</span>
+          v-for="t in xAxisTicks"
+          :key="t.label"
+          :style="{ left: t.pos + '%' }"
+        >{{ t.label }}</span>
       </div>
       <div class="hans-heatmap-legend">
-        <span class="lbl">low</span>
+        <span class="lbl">poor</span>
         <span class="grad" :style="{ background: legendGradient }"></span>
-        <span class="lbl">high</span>
-        <span class="meta">comfort score</span>
+        <span class="lbl">ideal</span>
+        <span class="meta">comfort</span>
       </div>
     </div>
   </div>
@@ -67,6 +67,19 @@ const theme = useTheme()
 const legendGradient = computed(() => comfortGradientCss(theme.value))
 
 const DAYS = computed(() => props.days ?? 7)
+
+// Desktop shows 24 hourly columns; mobile collapses to 4 day-parts
+// (night / morning / afternoon / evening) so the cells stay big and legible.
+const isMobile = useIsMobile()
+const COLS = computed(() => (isMobile.value ? 4 : 24))
+const HOURS_PER_COL = computed(() => 24 / COLS.value)
+
+const xAxisTicks = computed(() => {
+  if (isMobile.value) {
+    return [0, 1, 2, 3].map(seg => ({ pos: ((seg + 0.5) / 4) * 100, label: `${String(seg * 6).padStart(2, '0')}` }))
+  }
+  return [0, 6, 12, 18].map(h => ({ pos: ((h + 0.5) / 24) * 100, label: `${String(h).padStart(2, '0')}:00` }))
+})
 
 /**
  * Number of whole local-calendar days between two Dates.
@@ -110,10 +123,11 @@ const rows = computed(() => {
     return Array.from({ length: DAYS.value }, (_, d) => ({
       dayIdx: d,
       label: '',
-      cells: Array.from({ length: 24 }, (_, h) => ({
-        key: `${d}-${h}`,
+      cells: Array.from({ length: COLS.value }, (_, c) => ({
+        key: `${d}-${c}`,
         color: 'transparent',
-        title: '',
+        score: null,
+        time: '',
         isNow: false,
       })),
     }))
@@ -126,22 +140,25 @@ const rows = computed(() => {
     return d.toLocaleDateString('en-GB', { weekday: 'short' })
   }
 
-  // Bucket readings: dayIdx (0..DAYS-1, DAYS-1 = today) × hour (0..23)
+  const cols = COLS.value
+  const hpc = HOURS_PER_COL.value
+
+  // Bucket readings: dayIdx (0..DAYS-1, DAYS-1 = today) × column (0..cols-1)
   const buckets = new Map<string, { temps: number[]; hums: number[] }>()
   for (const r of props.readings) {
     const ts = new Date(r.recorded_at)
     const dayDiff = localDayDiff(nowDate, ts)
     if (dayDiff < 0 || dayDiff >= DAYS.value) continue
     const dayIdx = DAYS.value - 1 - dayDiff
-    const hour = ts.getHours()
-    const key = `${dayIdx}-${hour}`
+    const col = Math.floor(ts.getHours() / hpc)
+    const key = `${dayIdx}-${col}`
     let b = buckets.get(key)
     if (!b) { b = { temps: [], hums: [] }; buckets.set(key, b) }
     if (r.metric === 'temperature') b.temps.push(r.value)
     if (r.metric === 'humidity')    b.hums.push(r.value)
   }
 
-  const nowHour = nowDate.getHours()
+  const nowCol = Math.floor(nowDate.getHours() / hpc)
   const nowDayIdx = DAYS.value - 1
 
   const result: Array<{
@@ -154,20 +171,24 @@ const rows = computed(() => {
     const daysBack = DAYS.value - 1 - d
     const label = dayLabelFor(daysBack)
     const cells: Array<{ key: string; color: string; score: number | null; time: string; isNow: boolean }> = []
-    for (let h = 0; h < 24; h++) {
-      const b = buckets.get(`${d}-${h}`)
+    for (let c = 0; c < cols; c++) {
+      const b = buckets.get(`${d}-${c}`)
       let score: number | null = null
       if (b && b.temps.length && b.hums.length) {
         const T = b.temps.reduce((a, x) => a + x, 0) / b.temps.length
         const RH = b.hums.reduce((a, x) => a + x, 0) / b.hums.length
         score = comfortScore(T, RH)
       }
+      const startH = c * hpc
+      const time = cols === 24
+        ? `${label} ${String(startH).padStart(2, '0')}:00`
+        : `${label} ${String(startH).padStart(2, '0')}–${String(startH + hpc).padStart(2, '0')}h`
       cells.push({
-        key: `${d}-${h}`,
+        key: `${d}-${c}`,
         color: comfortColor(score, theme.value),
         score,
-        time: `${label} ${String(h).padStart(2, '0')}:00`,
-        isNow: d === nowDayIdx && h === nowHour,
+        time,
+        isNow: d === nowDayIdx && c === nowCol,
       })
     }
     result.push({ dayIdx: d, label, cells })
@@ -207,6 +228,7 @@ function positionTooltip(e: MouseEvent) {
 <style>
 .hans-heatmap {
   /* Shared sizing so the foot's X-axis aligns with the cell columns above */
+  --hm-cols: 24;
   --hm-label-col: 36px;
   --hm-col-gap: 4px;
   --hm-row-gap: 3px;
@@ -214,7 +236,7 @@ function positionTooltip(e: MouseEvent) {
 
 .hans-heatmap-grid {
   display: grid;
-  grid-template-columns: var(--hm-label-col) repeat(24, 1fr);
+  grid-template-columns: var(--hm-label-col) repeat(var(--hm-cols), 1fr);
   gap: var(--hm-row-gap) var(--hm-col-gap);
 }
 .hans-heatmap-rowlabel {
@@ -292,27 +314,31 @@ function positionTooltip(e: MouseEvent) {
 .hans-heatmap-legend .meta { margin-left: 12px; font-family: var(--font-chart); font-feature-settings: 'tnum' 1; letter-spacing: 0.04em; }
 
 @media (max-width: 640px) {
+  /* 4 day-part columns instead of 24 hours → big, readable cells */
   .hans-heatmap {
-    --hm-label-col: 24px;
-    --hm-col-gap: 1px;
-    --hm-row-gap: 2px;
+    --hm-cols: 4;
+    --hm-label-col: 32px;
+    --hm-col-gap: 4px;
+    --hm-row-gap: 4px;
     overflow: hidden;
   }
-  .hans-heatmap-rowlabel { font-size: 9px; }
+  .hans-heatmap-rowlabel { font-size: 11px; }
   .hans-heatmap-cell {
     aspect-ratio: unset;
-    height: 8px;
-    border-radius: 2px;
+    height: 26px;
+    border-radius: 6px;
     border-width: 0;
   }
   .hans-heatmap-cell.now { border-width: 1px; }
   .hans-heatmap-foot {
     flex-direction: column;
-    align-items: flex-start;
-    gap: 6px;
+    align-items: stretch;
+    gap: 10px;
+    margin-top: 12px;
   }
-  .hans-heatmap-legend .meta { display: none; }
-  .hans-heatmap-xaxis { font-size: 9px; }
+  .hans-heatmap-legend { font-size: 10px; justify-content: flex-start; }
+  .hans-heatmap-legend .grad { width: 90px; height: 10px; }
+  .hans-heatmap-xaxis { font-size: 10px; height: 14px; }
 }
 
 /* ── Tooltip (teleported to body) ── */
