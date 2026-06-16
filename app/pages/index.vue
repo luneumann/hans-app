@@ -443,40 +443,6 @@ onUnmounted(() => {
 
     <template v-else>
 
-      <!-- NARRATIVE + MASCOT -->
-      <div class="hans-narrative-row" style="display:grid;grid-template-columns:1fr 320px;gap:16px;align-items:stretch;margin-bottom:8px">
-        <div class="hans-card">
-          <h3 style="font-size:11px;letter-spacing:0.16em;text-transform:uppercase;color:var(--ink-3);margin:0 0 12px;font-weight:500">House dispatch</h3>
-          <HansNarrative
-            :temp="heroTemp"
-            :humidity="heroHum"
-            :pressure="houseAvg('pressure')"
-            :dew-point="houseDewPoint"
-            :pressure-delta="housePressureDelta"
-            :light="houseAvg('light')"
-            :hour="hour"
-            :warmest-room="warmestRoom"
-            :coolest-room="coolestRoom"
-            :online-count="onlineCount"
-            :total-count="sparrows.length"
-          />
-        </div>
-        <div class="hans-card hans-mascot-panel">
-          <div class="mascot-wrap">
-            <HansMascot
-              :size="110"
-              :vitality="mascotVitality"
-              :humidity="heroHum ?? 50"
-            />
-          </div>
-          <div class="info">
-            <div class="mood-label">Hans is</div>
-            <div class="mood">{{ mascotMood }}</div>
-            <div class="mood-detail">{{ mascotDetail }}</div>
-          </div>
-        </div>
-      </div>
-
       <!-- METRICS — desktop only; on mobile the current value is merged into
            each trend card below to avoid showing the same metrics twice. -->
       <template v-if="!isMobile">
@@ -558,6 +524,40 @@ onUnmounted(() => {
           </div>
         </div>
       </HansChartCarousel>
+
+      <!-- NARRATIVE + MASCOT -->
+      <div class="hans-narrative-row" style="display:grid;grid-template-columns:1fr 320px;gap:16px;align-items:stretch;margin:8px 0">
+        <div class="hans-card">
+          <h3 style="font-size:11px;letter-spacing:0.16em;text-transform:uppercase;color:var(--ink-3);margin:0 0 12px;font-weight:500">House dispatch</h3>
+          <HansNarrative
+            :temp="heroTemp"
+            :humidity="heroHum"
+            :pressure="houseAvg('pressure')"
+            :dew-point="houseDewPoint"
+            :pressure-delta="housePressureDelta"
+            :light="houseAvg('light')"
+            :hour="hour"
+            :warmest-room="warmestRoom"
+            :coolest-room="coolestRoom"
+            :online-count="onlineCount"
+            :total-count="sparrows.length"
+          />
+        </div>
+        <div class="hans-card hans-mascot-panel">
+          <div class="mascot-wrap">
+            <HansMascot
+              :size="110"
+              :vitality="mascotVitality"
+              :humidity="heroHum ?? 50"
+            />
+          </div>
+          <div class="info">
+            <div class="mood-label">Hans is</div>
+            <div class="mood">{{ mascotMood }}</div>
+            <div class="mood-detail">{{ mascotDetail }}</div>
+          </div>
+        </div>
+      </div>
 
       <!-- 7d COMFORT RHYTHM -->
       <div class="hans-section-head">

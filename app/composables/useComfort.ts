@@ -11,29 +11,29 @@
  * get a "feels like" reading (heat index when warm) and a dew-point label.
  */
 
-// ASHRAE-55 comfort band (typical, light clothing, sedentary).
+// ASHRAE-55 comfort band (typical, light clothing, sedentary) — used for the
+// pass/fail verdict label.
 const T_LO = 20, T_HI = 24
 const RH_LO = 30, RH_HI = 60
 
+// Ideal target the score decays away from, so the number reacts within the
+// normal range instead of pinning at 100 across the whole comfort box.
+const T_IDEAL = 21.5, RH_IDEAL = 45
+
 export type ComfortTone = 'good' | 'warn' | 'bad' | 'neutral'
 
-/** Distance a value sits outside a [lo, hi] band (0 when inside). */
-function bandDistance(v: number, lo: number, hi: number): number {
-  if (v < lo) return lo - v
-  if (v > hi) return v - hi
-  return 0
-}
-
 /**
- * 0–100 indoor comfort proximity. 100 = inside the ASHRAE box; falls off
- * with distance outside it (temperature weighted more heavily than humidity,
- * since a few degrees is felt far more than a few % RH).
+ * 0–100 indoor comfort. 100 only at the ideal point (21.5 °C / 45 % RH); it
+ * decays with distance from ideal — temperature weighted more heavily than
+ * humidity, since a few degrees is felt far more than a few % RH. This keeps
+ * the score discriminating across normal indoor conditions instead of pinning
+ * at 100 everywhere inside the comfort box.
  */
 export function comfortScore(T: number | null, RH: number | null): number | null {
   if (T === null || RH === null) return null
-  const dt = bandDistance(T, T_LO, T_HI)
-  const dh = bandDistance(RH, RH_LO, RH_HI)
-  return Math.round(Math.max(0, Math.min(100, 100 - dt * 9 - dh * 0.8)))
+  const dt = Math.abs(T - T_IDEAL)
+  const dh = Math.abs(RH - RH_IDEAL)
+  return Math.round(Math.max(0, Math.min(100, 100 - dt * 6 - dh * 0.6)))
 }
 
 /** Human-readable indoor comfort verdict, e.g. "comfortable", "cold & humid". */
