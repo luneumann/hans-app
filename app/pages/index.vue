@@ -322,6 +322,75 @@ const coolestRoom = computed(() => {
   return best
 })
 
+// Weekly recap: worst night's sleep, widest swing, and comfort streak — all
+// derived from the same weekRows already fetched for the heatmap, bucketed
+// per day since temperature/humidity aren't reported in matched pairs.
+interface DailyBucket { tSum: number; tN: number; rhSum: number; rhN: number }
+const weeklyRecap = computed(() => {
+  const rows = weekRows.value ?? []
+  const nightBuckets = new Map<string, Map<string, DailyBucket>>()
+  const dayBuckets = new Map<string, Map<string, DailyBucket>>()
+  const ranges = new Map<string, { min: number; max: number }>()
+
+  function addTo(map: Map<string, Map<string, DailyBucket>>, day: string, sparrow: string, metric: string, value: number) {
+    if (!map.has(day)) map.set(day, new Map())
+    const sm = map.get(day)!
+    if (!sm.has(sparrow)) sm.set(sparrow, { tSum: 0, tN: 0, rhSum: 0, rhN: 0 })
+    const b = sm.get(sparrow)!
+    if (metric === 'temperature') { b.tSum += value; b.tN++ }
+    if (metric === 'humidity') { b.rhSum += value; b.rhN++ }
+  }
+
+  for (const r of rows) {
+    const day = r.recorded_at.slice(0, 10)
+    const hour = parseRecordedAt(r.recorded_at).getHours()
+
+    if (r.metric === 'temperature') {
+      const rg = ranges.get(r.sparrow_id) ?? { min: r.value, max: r.value }
+      rg.min = Math.min(rg.min, r.value)
+      rg.max = Math.max(rg.max, r.value)
+      ranges.set(r.sparrow_id, rg)
+    }
+
+    addTo(dayBuckets, day, r.sparrow_id, r.metric, r.value)
+    if (hour >= 22 || hour < 6) addTo(nightBuckets, day, r.sparrow_id, r.metric, r.value)
+  }
+
+  const indoorIds = indoorSparrows.value
+
+  let worstNight: { room: string; day: string; score: number } | null = null
+  for (const [day, bySparrow] of nightBuckets) {
+    for (const [sparrow, b] of bySparrow) {
+      if (!indoorIds.includes(sparrow) || !b.tN || !b.rhN) continue
+      const score = comfortScore(b.tSum / b.tN, b.rhSum / b.rhN)
+      if (score === null) continue
+      if (!worstNight || score < worstNight.score) worstNight = { room: sparrow, day, score }
+    }
+  }
+
+  let biggestSwing: { room: string; delta: number } | null = null
+  for (const [sparrow, rg] of ranges) {
+    const delta = rg.max - rg.min
+    if (!biggestSwing || delta > biggestSwing.delta) biggestSwing = { room: sparrow, delta }
+  }
+
+  const days = [...dayBuckets.keys()].sort()
+  let streak: { room: string; days: number } | null = null
+  for (const sparrow of indoorIds) {
+    let count = 0
+    for (let i = days.length - 1; i >= 0; i--) {
+      const b = dayBuckets.get(days[i])?.get(sparrow)
+      if (!b || !b.tN || !b.rhN) break
+      const score = comfortScore(b.tSum / b.tN, b.rhSum / b.rhN)
+      if (score === null || score < 70) break
+      count++
+    }
+    if (count >= 2 && (!streak || count > streak.days)) streak = { room: sparrow, days: count }
+  }
+
+  return { worstNight, biggestSwing, streak }
+})
+
 // Aurora hue is interpolated from the theme's auroraStops by temperature.
 const theme = useTheme()
 const auroraHue = computed(() => auroraHueFor(houseAvg('temperature'), theme.value))
@@ -541,6 +610,9 @@ onUnmounted(() => {
             :coolest-room="coolestRoom"
             :online-count="onlineCount"
             :total-count="sparrows.length"
+            :weekly-worst-night="weeklyRecap.worstNight"
+            :weekly-biggest-swing="weeklyRecap.biggestSwing"
+            :weekly-streak="weeklyRecap.streak"
           />
         </div>
         <div class="hans-card hans-mascot-panel">

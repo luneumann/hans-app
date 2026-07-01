@@ -15,7 +15,14 @@ const props = defineProps<{
   coolestRoom: { name: string; value: number } | null
   onlineCount: number
   totalCount: number
+  weeklyWorstNight: { room: string; day: string; score: number } | null
+  weeklyBiggestSwing: { room: string; delta: number } | null
+  weeklyStreak: { room: string; days: number } | null
 }>()
+
+function dayName(iso: string): string {
+  return new Date(`${iso}T12:00:00`).toLocaleDateString('en-US', { weekday: 'long' })
+}
 
 function tempPhrase(t: number): string {
   if (t < 17) return 'crisp'
@@ -86,6 +93,18 @@ const text = computed(() => {
 
   if (props.onlineCount < props.totalCount) {
     parts.push(`${props.totalCount - props.onlineCount} of ${props.totalCount} sparrows are quiet.`)
+  }
+
+  if (props.weeklyWorstNight && props.weeklyWorstNight.score < 55) {
+    parts.push(`*${props.weeklyWorstNight.room}* had its roughest night ${dayName(props.weeklyWorstNight.day)}, comfort dipping to ${props.weeklyWorstNight.score}/100.`)
+  }
+
+  if (props.weeklyBiggestSwing && props.weeklyBiggestSwing.delta > 8) {
+    parts.push(`*${props.weeklyBiggestSwing.room}* swung ${props.weeklyBiggestSwing.delta.toFixed(1)}° this week — the widest range of any room.`)
+  }
+
+  if (props.weeklyStreak && props.weeklyStreak.days >= 3) {
+    parts.push(`*${props.weeklyStreak.room}* has stayed comfortable for ${props.weeklyStreak.days} days running.`)
   }
 
   return parts.join(' ')
