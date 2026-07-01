@@ -21,6 +21,11 @@
         <input v-model="customTo" type="date" class="hans-export-select" style="flex:1" />
       </div>
 
+      <label style="display:flex;align-items:center;gap:8px;margin-bottom:14px;font-size:13px;color:var(--ink-3)">
+        <input v-model="sampleEvery1000" type="checkbox" />
+        Only every 1000th entry
+      </label>
+
       <button class="hans-export-btn" :disabled="exporting" @click="copyAllData">
         {{ exportLabel }}
       </button>
@@ -42,6 +47,7 @@ const exportLabel = ref('Copy all data')
 const rangeOption = ref('all')
 const customFrom = ref('')
 const customTo = ref('')
+const sampleEvery1000 = ref(false)
 
 function rangeBounds(): { from?: string; to?: string } {
   const now = new Date()
@@ -91,8 +97,9 @@ async function copyAllData() {
       if (data.length < pageSize) break
     }
 
-    await navigator.clipboard.writeText(JSON.stringify(rows, null, 2))
-    exportLabel.value = `Copied ${rows.length} rows`
+    const output = sampleEvery1000.value ? rows.filter((_, i) => i % 1000 === 0) : rows
+    await navigator.clipboard.writeText(JSON.stringify(output, null, 2))
+    exportLabel.value = `Copied ${output.length} rows`
   } catch (err) {
     exportError.value = err instanceof Error ? err.message : 'Failed to export data.'
     exportLabel.value = 'Copy all data'
