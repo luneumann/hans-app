@@ -5,8 +5,22 @@
     <div class="hans-card" style="margin-bottom:24px">
       <div style="font-size:15px;color:var(--ink);margin-bottom:4px">Data export</div>
       <div style="font-size:13px;color:var(--ink-3);margin-bottom:16px">
-        Copy every sensor reading in the database to your clipboard as JSON.
+        Copy sensor readings to your clipboard as JSON.
       </div>
+
+      <select v-model="rangeOption" class="hans-export-select" style="margin-bottom:10px">
+        <option value="all">All time</option>
+        <option value="7d">Last 7 days</option>
+        <option value="30d">Last 30 days</option>
+        <option value="90d">Last 90 days</option>
+        <option value="custom">Custom range…</option>
+      </select>
+
+      <div v-if="rangeOption === 'custom'" style="display:flex;gap:8px;margin-bottom:10px">
+        <input v-model="customFrom" type="date" class="hans-export-select" style="flex:1" />
+        <input v-model="customTo" type="date" class="hans-export-select" style="flex:1" />
+      </div>
+
       <button class="hans-export-btn" :disabled="exporting" @click="copyAllData">
         {{ exportLabel }}
       </button>
@@ -25,6 +39,28 @@ const supabase = useSupabaseClient()
 const exporting = ref(false)
 const exportError = ref('')
 const exportLabel = ref('Copy all data')
+const rangeOption = ref('all')
+const customFrom = ref('')
+const customTo = ref('')
+
+function rangeBounds(): { from?: string; to?: string } {
+  const now = new Date()
+  switch (rangeOption.value) {
+    case '7d':
+      return { from: new Date(now.getTime() - 7 * 86400000).toISOString() }
+    case '30d':
+      return { from: new Date(now.getTime() - 30 * 86400000).toISOString() }
+    case '90d':
+      return { from: new Date(now.getTime() - 90 * 86400000).toISOString() }
+    case 'custom':
+      return {
+        from: customFrom.value ? new Date(customFrom.value).toISOString() : undefined,
+        to: customTo.value ? new Date(customTo.value + 'T23:59:59').toISOString() : undefined,
+      }
+    default:
+      return {}
+  }
+}
 
 async function copyAllData() {
   exporting.value = true
@@ -32,15 +68,21 @@ async function copyAllData() {
   exportLabel.value = 'Exporting…'
 
   try {
+    const { from: fromDate, to: toDate } = rangeBounds()
     const pageSize = 1000
     const rows: Record<string, unknown>[] = []
 
     for (let from = 0; ; from += pageSize) {
-      const { data, error } = await supabase
+      let query = supabase
         .from('sensor_readings')
         .select('*')
         .order('recorded_at', { ascending: true })
         .range(from, from + pageSize - 1)
+
+      if (fromDate) query = query.gte('recorded_at', fromDate)
+      if (toDate) query = query.lte('recorded_at', toDate)
+
+      const { data, error } = await query
 
       if (error) throw error
       if (!data || data.length === 0) break
@@ -79,4 +121,16 @@ async function copyAllData() {
 }
 .hans-export-btn:active { transform: scale(0.99); }
 .hans-export-btn:disabled { opacity: 0.6; cursor: default; }
+
+.hans-export-select {
+  width: 100%;
+  padding: 11px 13px;
+  border: 1px solid var(--line, rgba(255,255,255,0.12));
+  border-radius: var(--r-md);
+  background: var(--bg-2, transparent);
+  color: var(--ink);
+  font-family: 'Geist', inherit;
+  font-size: 14px;
+  -webkit-tap-highlight-color: transparent;
+}
 </style>
