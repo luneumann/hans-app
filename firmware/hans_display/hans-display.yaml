@@ -40,11 +40,14 @@ psram:
   mode: octal
   speed: 80MHz
 
+# Seeed routes the USB-C port through a CH340 bridge on UART0 rather than the
+# ESP32-S3's native USB. ESPHome would otherwise default to USB_SERIAL_JTAG on
+# this chip and the serial log would go to a peripheral nothing is attached to.
 logger:
+  hardware_uart: UART0
 
-# Not Home Assistant-specific: this is also what `esphome logs` connects to.
-# The board wires I2C to GPIO19/20, which are the USB-Serial-JTAG pins, so USB
-# logging is unavailable once the SHT4x is up — logs have to come over the air.
+# Not Home Assistant-specific: this is also what `esphome logs` connects to
+# once the cable is out and updates happen over the air.
 api:
   encryption:
     key: !secret api_encryption_key
@@ -75,8 +78,8 @@ spi:
   clk_pin: GPIO7
   mosi_pin: GPIO9
 
-# Shares pins with USB-Serial-JTAG (see the note on `api` above) — this is how
-# Seeed wired the board, not a choice.
+# GPIO19/20 double as the native USB-Serial-JTAG pins, so ESPHome warns here.
+# Harmless on this board: serial runs over the CH340 on UART0 instead.
 i2c:
   sda: GPIO19
   scl: GPIO20

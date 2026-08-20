@@ -43,12 +43,13 @@ The dev server has to be running and reachable while the panel refreshes —
 ```
 
 Only the first flash needs the cable; after that ESPHome updates over the air.
-If the port is not detected, hold BOOT while plugging in.
 
-Note that GPIO19/20 carry I²C on this board and are also the USB-Serial-JTAG
-pins, so USB logging stops working once the SHT4x initialises. That is why the
-config includes an `api:` block — `esphome logs` reaches the device over the
-network instead.
+The USB-C port runs through a CH340 bridge on UART0, not the ESP32-S3's native
+USB, so the device appears as `/dev/cu.usbserial-*` rather than `usbmodem`, and
+macOS may need WCH's CH340 driver. The bridge drives EN/BOOT, so no button
+press is needed to enter flashing mode. The config pins `logger` to UART0 for
+the same reason — ESPHome's default of USB_SERIAL_JTAG would log into a
+peripheral nothing is attached to.
 
 ## 5. Verify
 
