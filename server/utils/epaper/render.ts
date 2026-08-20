@@ -1,5 +1,6 @@
-import { existsSync } from 'node:fs'
-import { resolve } from 'node:path'
+import { mkdirSync, writeFileSync, existsSync } from 'node:fs'
+import { join } from 'node:path'
+import { tmpdir } from 'node:os'
 import { Resvg } from '@resvg/resvg-js'
 import { PNG } from 'pngjs'
 import { dither, PALETTES, type PaletteName } from './palette'
@@ -8,23 +9,53 @@ export const SCREEN_W = 800
 export const SCREEN_H = 480
 
 /**
- * Optional font drop-in. resvg can only load fonts from disk, so anything
- * here is picked up automatically; without it we fall back to whatever the
- * host has installed (fine locally, thin on a serverless runtime).
+ * Fonts have to reach resvg as files on disk — it has no buffer API — and a
+ * serverless runtime ships with essentially no fonts installed. So anything
+ * under server/assets/fonts is bundled as a Nitro server asset and unpacked
+ * into the writable temp directory once per cold start.
+ *
+ * With no fonts bundled this resolves to an empty list and the renderer falls
+ * back to whatever the host has, which is fine locally and thin in the cloud.
  */
-const FONT_DIR = resolve(process.cwd(), 'server/assets/fonts')
+let fontPaths: string[] | null = null
+
+async function ensureFonts(): Promise<string[]> {
+  if (fontPaths) return fontPaths
+
+  const dir = join(tmpdir(), 'hans-fonts')
+  const storage = useStorage('assets:fonts')
+  const keys = await storage.getKeys()
+
+  mkdirSync(dir, { recursive: true })
+  const paths: string[] = []
+  for (const key of keys) {
+    const target = join(dir, key.replace(/:/g, '_'))
+    if (!existsSync(target)) {
+      const bytes = await storage.getItemRaw<Buffer | Uint8Array>(key)
+      if (!bytes) continue
+      writeFileSync(target, Buffer.from(bytes as Uint8Array))
+    }
+    paths.push(target)
+  }
+
+  fontPaths = paths
+  return paths
+}
 
 /**
  * Rasterise an SVG to a PNG the panel can consume directly: exact palette
  * colours, no alpha, no grey.
  */
-export function svgToPng(svg: string, palette: PaletteName): Buffer {
+export async function svgToPng(svg: string, palette: PaletteName): Promise<Buffer> {
+  const fontFiles = await ensureFonts()
+
   const resvg = new Resvg(svg, {
     fitTo: { mode: 'width', value: SCREEN_W },
     background: 'white',
     font: {
-      loadSystemFonts: true,
-      fontDirs: existsSync(FONT_DIR) ? [FONT_DIR] : [],
+      // Only trust the host's own fonts when we brought none of our own.
+      loadSystemFonts: fontFiles.length === 0,
+      fontFiles,
       defaultFontFamily: 'Geist',
     },
   })

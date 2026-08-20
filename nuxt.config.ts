@@ -27,6 +27,11 @@ export default defineNuxtConfig({
       allowedHosts: (process.env.DEV_ALLOWED_HOSTS ?? '').split(',').filter(Boolean),
     },
   },
+  nitro: {
+    // Bundled into the server output so the e-paper renderer can unpack them
+    // at runtime; a serverless function cannot read from the static dir.
+    serverAssets: [{ baseName: 'fonts', dir: '../server/assets/fonts' }],
+  },
   compatibilityDate: '2025-07-15',
   devtools: { enabled: true },
   modules: ['@nuxtjs/supabase', '@nuxt/ui'],

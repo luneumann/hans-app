@@ -6,7 +6,7 @@ import { epaperPayload, svgToPng } from '../utils/epaper'
  */
 export default defineEventHandler(async (event) => {
   const { svg, palette } = await epaperPayload(event)
-  const png = svgToPng(svg, palette)
+  const png = await svgToPng(svg, palette)
 
   setHeader(event, 'content-type', 'image/png')
   setHeader(event, 'content-length', png.length)
