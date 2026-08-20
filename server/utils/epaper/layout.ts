@@ -1,10 +1,10 @@
-import type { EpaperData, Room, RhythmData, RhythmTone } from './data'
+import type { EpaperData, RhythmData, RhythmTone } from './data'
 import type { ComfortTone } from '../../../app/composables/useComfort'
 import type { PaletteName } from './palette'
 import { SCREEN_W, SCREEN_H } from './render'
 
 /**
- * Panel layouts.
+ * The two panel pages: the everyday dashboard, and the weekly comfort rhythm.
  *
  * Two constraints shape all of them. There are six colours and no greys, so
  * colour carries meaning (comfort verdict, indoor vs. outdoor) and never
@@ -12,13 +12,6 @@ import { SCREEN_W, SCREEN_H } from './render'
  * black on pure white: any other pairing halftones, which at 17 px is
  * unreadable from across the room.
  */
-
-export const LAYOUTS = ['dashboard', 'focus', 'grid'] as const
-export type LayoutName = (typeof LAYOUTS)[number]
-
-export function isLayoutName(v: string): v is LayoutName {
-  return (LAYOUTS as readonly string[]).includes(v)
-}
 
 const PAD = 32
 const RULE = '#000000'
@@ -127,8 +120,8 @@ function header(d: EpaperData, batteryPct: number | null, ctx: Ctx): void {
 }
 
 // ─── dashboard ───────────────────────────────────────────────────────────────
-// The original: house average plus a full room list. Most information, least
-// legible from a distance.
+// House average, comfort verdict, per-room list, 24 h trend and the outdoor
+// reading — the everyday page.
 
 function layoutDashboard(d: EpaperData, ctx: Ctx): void {
   const { push, mono, accent } = ctx
@@ -182,123 +175,6 @@ function layoutDashboard(d: EpaperData, ctx: Ctx): void {
     push(`<text x="${rightX}" y="458" font-size="24" text-anchor="end"
       fill="#000000">${esc(num(d.outdoor.humidity, 0))} %</text>`)
   }
-}
-
-// ─── focus ───────────────────────────────────────────────────────────────────
-// One number owns the screen. Everything that explains where it came from is
-// demoted to the footer, at the smallest size that still reads up close.
-
-function layoutFocus(d: EpaperData, ctx: Ctx): void {
-  const { push, mono, accent } = ctx
-  const rightX = SCREEN_W - PAD
-
-  push(`<text x="${PAD}" y="252" font-size="168" font-weight="300"
-    fill="#000000">${esc(num(d.house.temp))}°</text>`)
-  push(`<text x="${PAD + 4}" y="296" font-size="20" fill="#000000">${esc(
-    `dew point ${num(d.house.dew)}° · ${d.house.label}`,
-  )}</text>`)
-
-  const colX = 516
-  push(label('humidity', colX, 140))
-  push(`<text x="${colX}" y="208" font-size="76" font-weight="300"
-    fill="#000000">${esc(num(d.house.humidity, 0))} %</text>`)
-
-  push(label('comfort', colX, 266))
-  push(`<rect x="${colX}" y="286" width="52" height="52" rx="8"
-    fill="${toneFill(d.house.tone, mono)}" stroke="${RULE}" stroke-width="3"/>`)
-  push(toneHatch(d.house.tone, mono, colX, 286, 52))
-  push(`<text x="${colX + 70}" y="334" font-size="76" font-weight="300"
-    fill="#000000">${d.house.score ?? '--'}</text>`)
-
-  push(`<rect x="${PAD}" y="366" width="${SCREEN_W - PAD * 2}" height="3" fill="${RULE}"/>`)
-
-  const divX = 470
-  push(label('rooms', PAD, 396))
-  d.rooms.slice(0, 2).forEach((room, i) => {
-    const y = 430 + i * 32
-    push(`<text x="${PAD}" y="${y}" font-size="19" fill="#000000">${esc(room.name)}</text>`)
-    push(`<text x="${divX - 40}" y="${y}" font-size="24" text-anchor="end"
-      fill="#000000">${esc(num(room.temp))}°</text>`)
-  })
-
-  if (d.outdoor) {
-    push(`<rect x="${divX}" y="366" width="3" height="${SCREEN_H - 366}" fill="${RULE}"/>`)
-    push(label(`outdoor · ${d.outdoor.name}`, divX + 26, 396, accent))
-    push(`<text x="${divX + 26}" y="452" font-size="52" font-weight="300"
-      fill="#000000">${esc(num(d.outdoor.temp))}°</text>`)
-    push(`<text x="${rightX}" y="452" font-size="24" text-anchor="end"
-      fill="#000000">${esc(num(d.outdoor.humidity, 0))} %</text>`)
-  }
-}
-
-// ─── grid ────────────────────────────────────────────────────────────────────
-// Per-room numbers at a size worth walking past. No averaging — you read the
-// room you care about. Columns adapt so two sensors do not look like a
-// half-empty table.
-
-function layoutGrid(d: EpaperData, ctx: Ctx): void {
-  const { push, mono, accent } = ctx
-
-  interface Cell { name: string; temp: number | null; humidity: number | null; tone: ComfortTone; outdoor: boolean }
-  const cells: Cell[] = d.rooms.map((r: Room) => ({
-    name: r.name, temp: r.temp, humidity: r.humidity, tone: r.tone, outdoor: false,
-  }))
-  if (d.outdoor) {
-    cells.push({
-      name: d.outdoor.name, temp: d.outdoor.temp, humidity: d.outdoor.humidity,
-      tone: 'neutral', outdoor: true,
-    })
-  }
-  if (!cells.length) {
-    push(`<text x="${PAD}" y="200" font-size="26" fill="#000000">no sensors reporting</text>`)
-    return
-  }
-
-  const top = 92, bottom = 396
-  const cols = Math.min(cells.length, 3)
-  const rowCount = Math.ceil(cells.length / cols)
-  const cellW = (SCREEN_W - PAD * 2) / cols
-  const cellH = (bottom - top) / rowCount
-  const tempSize = rowCount === 1 ? 92 : 62
-
-  // Label, number and humidity as one block, centred in the cell — otherwise a
-  // single row leaves the numbers stranded against the top rule.
-  const contentH = 26 + tempSize + 34
-  cells.forEach((cell, i) => {
-    const cx = PAD + (i % cols) * cellW
-    const cy = top + Math.floor(i / cols) * cellH + Math.max(0, (cellH - contentH) / 2) - 8
-
-    if (i % cols !== 0) {
-      push(`<rect x="${cx - 2}" y="${cy + 8}" width="3" height="${cellH - 24}" fill="${RULE}"/>`)
-    }
-    push(label(cell.name, cx + 22, cy + 26, cell.outdoor ? accent : '#000000'))
-    if (!cell.outdoor) {
-      push(`<rect x="${cx + 22}" y="${cy + 38}" width="14" height="14"
-        fill="${toneFill(cell.tone, mono)}" stroke="${RULE}" stroke-width="2"/>`)
-      push(toneHatch(cell.tone, mono, cx + 22, cy + 38, 14))
-    }
-    push(`<text x="${cx + 22}" y="${cy + 44 + tempSize}" font-size="${tempSize}"
-      font-weight="300" fill="#000000">${esc(num(cell.temp))}°</text>`)
-    push(`<text x="${cx + 26}" y="${cy + 78 + tempSize}" font-size="22"
-      fill="#000000">${esc(num(cell.humidity, 0))} % rel</text>`)
-  })
-
-  push(`<rect x="${PAD}" y="${bottom + 8}" width="${SCREEN_W - PAD * 2}" height="3" fill="${RULE}"/>`)
-  push(label('house', PAD, 436))
-  push(`<text x="${PAD + 92}" y="442" font-size="32" font-weight="300" fill="#000000">${esc(
-    `${num(d.house.temp)}°  ·  ${num(d.house.humidity, 0)} %`,
-  )}</text>`)
-  push(`<rect x="${SCREEN_W - PAD - 148}" y="412" width="40" height="40" rx="6"
-    fill="${toneFill(d.house.tone, mono)}" stroke="${RULE}" stroke-width="3"/>`)
-  push(toneHatch(d.house.tone, mono, SCREEN_W - PAD - 148, 412, 40))
-  push(`<text x="${SCREEN_W - PAD}" y="444" font-size="34" font-weight="300"
-    text-anchor="end" fill="#000000">${d.house.score ?? '--'}</text>`)
-}
-
-const RENDERERS: Record<LayoutName, (d: EpaperData, ctx: Ctx) => void> = {
-  dashboard: layoutDashboard,
-  focus: layoutFocus,
-  grid: layoutGrid,
 }
 
 // ─── rhythm ──────────────────────────────────────────────────────────────────
@@ -387,11 +263,10 @@ export function buildRhythmSvg(
     viewBox="0 0 ${SCREEN_W} ${SCREEN_H}" font-family="${FONT}">${parts.join('')}</svg>`
 }
 
-export function buildSvg(
+export function buildDashboardSvg(
   d: EpaperData,
   palette: PaletteName = 'spectra6',
   batteryPct: number | null = null,
-  layout: LayoutName = 'dashboard',
 ): string {
   const parts: string[] = []
   const ctx: Ctx = {
@@ -402,7 +277,7 @@ export function buildSvg(
 
   ctx.push(`<rect width="${SCREEN_W}" height="${SCREEN_H}" fill="#FFFFFF"/>`)
   header(d, batteryPct, ctx)
-  RENDERERS[layout](d, ctx)
+  layoutDashboard(d, ctx)
 
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${SCREEN_W}" height="${SCREEN_H}"
     viewBox="0 0 ${SCREEN_W} ${SCREEN_H}" font-family="${FONT}">${parts.join('')}</svg>`

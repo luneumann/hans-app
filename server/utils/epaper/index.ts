@@ -1,10 +1,10 @@
 import type { H3Event } from 'h3'
 import { fetchEpaperData, fetchRhythmData } from './data'
-import { buildSvg, buildRhythmSvg, isLayoutName, type LayoutName } from './layout'
+import { buildDashboardSvg, buildRhythmSvg } from './layout'
 import { isPaletteName, type PaletteName } from './palette'
 
 export { svgToPng, SCREEN_W, SCREEN_H } from './render'
-export { buildSvg, buildRhythmSvg, LAYOUTS, isLayoutName, type LayoutName } from './layout'
+export { buildDashboardSvg, buildRhythmSvg } from './layout'
 export { fetchEpaperData, deriveEpaperData, fetchRhythmData, deriveRhythmData } from './data'
 
 /**
@@ -13,7 +13,7 @@ export { fetchEpaperData, deriveEpaperData, fetchRhythmData, deriveRhythmData } 
  * The device sends a raw counter and never learns how many pages exist, so
  * adding one here changes what the buttons do without reflashing.
  */
-export const PAGES = ['dashboard', 'focus', 'grid', 'rhythm'] as const
+export const PAGES = ['dashboard', 'rhythm'] as const
 export type PageName = (typeof PAGES)[number]
 
 /** Proper modulo — the device's counter goes negative when paging backwards. */
@@ -41,16 +41,14 @@ export async function epaperPayload(event: H3Event): Promise<{ svg: string; pale
     ? Math.round(Math.min(100, Math.max(0, rawBattery)))
     : null
 
-  // `page` is what the buttons drive; `layout` stays available for pulling one
-  // up directly in a browser.
-  let page: PageName
-  const rawPage = Number(query.page)
-  if (Number.isFinite(rawPage)) {
-    page = PAGES[wrap(Math.trunc(rawPage), PAGES.length)]
-  } else {
-    const wanted = String(query.layout ?? 'dashboard')
-    page = isLayoutName(wanted) ? wanted : 'dashboard'
-  }
+  // The panel sends a counter; a browser can pass the name instead.
+  const rawPage = String(query.page ?? '')
+  const asNumber = Number(rawPage)
+  const page: PageName = Number.isFinite(asNumber) && rawPage !== ''
+    ? PAGES[wrap(Math.trunc(asNumber), PAGES.length)]
+    : (PAGES as readonly string[]).includes(rawPage)
+      ? (rawPage as PageName)
+      : 'dashboard'
 
   if (page === 'rhythm') {
     const rhythm = await fetchRhythmData()
@@ -58,5 +56,5 @@ export async function epaperPayload(event: H3Event): Promise<{ svg: string; pale
   }
 
   const data = await fetchEpaperData()
-  return { svg: buildSvg(data, palette, battery, page as LayoutName), palette }
+  return { svg: buildDashboardSvg(data, palette, battery), palette }
 }
