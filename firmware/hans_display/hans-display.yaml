@@ -17,6 +17,7 @@ substitutions:
   # Sparrow id this panel reports its own SHT4x readings under. Must exist in
   # the devices table before Supabase will accept the inserts.
   sparrow_id: hallway
+  dashboard_url: !secret hans_dashboard_url
 
 esphome:
   name: ${device_name}
@@ -25,11 +26,13 @@ esphome:
     priority: 600
     then:
       # Wi-Fi and SNTP need a moment before the first fetch can succeed.
-      - delay: 20s
-      - component.update: dashboard_image
       - output.turn_on: battery_enable
       - delay: 200ms
       - component.update: battery_voltage
+      - component.update: battery_level
+      # Wi-Fi and SNTP need a moment before the first fetch can succeed.
+      - delay: 20s
+      - script.execute: refresh_dashboard
 
 esp32:
   board: esp32-s3-devkitc-1
@@ -86,9 +89,21 @@ i2c:
 
 # ─── The dashboard image ─────────────────────────────────────────────────────
 
+# The panel is the only thing that can measure its own charge, so it appends
+# the value to the request and the server draws it into the header.
+script:
+  - id: refresh_dashboard
+    then:
+      - lambda: |-
+          char url[256];
+          snprintf(url, sizeof(url), "${dashboard_url}&battery=%d",
+                   (int) roundf(id(battery_level).state));
+          id(dashboard_image).set_url(url);
+      - component.update: dashboard_image
+
 online_image:
   - id: dashboard_image
-    url: !secret hans_dashboard_url
+    url: ${dashboard_url}
     format: PNG
     type: RGB565
     buffer_size: 65536
@@ -132,7 +147,9 @@ time:
                   auto now = id(sntp_time).now();
                   return !(now.hour >= 1 && now.hour < 6);
               then:
-                - component.update: dashboard_image
+                - component.update: battery_voltage
+                - component.update: battery_level
+                - script.execute: refresh_dashboard
 
 # ─── Onboard sensors ─────────────────────────────────────────────────────────
 # The panel has an SHT4x, so it doubles as a sparrow and reports the room it
@@ -185,6 +202,34 @@ sensor:
     filters:
       - multiply: 2.0   # on-board divider
 
+  # Voltage is what the ADC gives; the curve turns it into something readable
+  # on the panel. Li-ion discharge is far from linear, hence the point list.
+  - platform: template
+    name: Battery Level
+    id: battery_level
+    unit_of_measurement: "%"
+    device_class: battery
+    state_class: measurement
+    lambda: 'return id(battery_voltage).state;'
+    update_interval: 5min
+    filters:
+      - calibrate_linear:
+          - 4.15 -> 100.0
+          - 3.96 -> 90.0
+          - 3.91 -> 80.0
+          - 3.85 -> 70.0
+          - 3.80 -> 60.0
+          - 3.75 -> 50.0
+          - 3.68 -> 40.0
+          - 3.58 -> 30.0
+          - 3.49 -> 20.0
+          - 3.41 -> 10.0
+          - 3.30 -> 5.0
+          - 3.27 -> 0.0
+      - clamp:
+          min_value: 0
+          max_value: 100
+
   - platform: wifi_signal
     name: Wi-Fi Signal
     update_interval: 60s
@@ -202,7 +247,7 @@ binary_sensor:
       inverted: true
     name: Refresh Button
     on_press:
-      - component.update: dashboard_image
+      - script.execute: refresh_dashboard
 
 # ─── Deep sleep ──────────────────────────────────────────────────────────────
 # Leave this off until the panel shows what you expect: while asleep the device

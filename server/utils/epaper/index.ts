@@ -28,6 +28,10 @@ export async function epaperPayload(event: H3Event): Promise<{ svg: string; pale
   const requested = String(query.palette ?? 'spectra6')
   const palette: PaletteName = isPaletteName(requested) ? requested : 'spectra6'
 
+  // Reported by the panel itself — it is the only thing that can measure it.
+  const raw = Number(query.battery)
+  const battery = Number.isFinite(raw) ? Math.round(Math.min(100, Math.max(0, raw))) : null
+
   const data = await fetchEpaperData()
-  return { svg: buildSvg(data, palette), palette }
+  return { svg: buildSvg(data, palette, battery), palette }
 }

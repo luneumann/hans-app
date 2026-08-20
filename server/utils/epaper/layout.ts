@@ -83,7 +83,29 @@ function sparkline(series: number[], x: number, y: number, w: number, h: number,
     stroke-linejoin="round" stroke-linecap="round"/>`
 }
 
-export function buildSvg(d: EpaperData, palette: PaletteName = 'spectra6'): string {
+/**
+ * Battery pill for the header. The panel is the only thing that knows its own
+ * charge, so it passes the value in on the URL; absent means "not reported"
+ * and the header simply falls back to the timestamp alone.
+ */
+function battery(pct: number, x: number, y: number, mono: boolean): string {
+  const w = 34, h = 16
+  const fill = pct <= 15 && !mono ? '#FF0000' : '#000000'
+  const inner = Math.max(1, Math.round((w - 6) * Math.min(100, Math.max(0, pct)) / 100))
+  return [
+    `<rect x="${x}" y="${y - h + 3}" width="${w}" height="${h}" rx="3"
+      fill="#FFFFFF" stroke="#000000" stroke-width="2"/>`,
+    `<rect x="${x + w + 1}" y="${y - h + 8}" width="3" height="6" fill="#000000"/>`,
+    `<rect x="${x + 3}" y="${y - h + 6}" width="${inner}" height="${h - 6}" fill="${fill}"/>`,
+    `<text x="${x + w + 12}" y="${y}" font-size="18" fill="#000000">${pct} %</text>`,
+  ].join('')
+}
+
+export function buildSvg(
+  d: EpaperData,
+  palette: PaletteName = 'spectra6',
+  batteryPct: number | null = null,
+): string {
   const mono = palette === 'mono'
   const accent = mono ? '#000000' : '#0000FF'
   const parts: string[] = []
@@ -94,10 +116,14 @@ export function buildSvg(d: EpaperData, palette: PaletteName = 'spectra6'): stri
   // ── Header ────────────────────────────────────────────────────────────────
   push(`<text x="${PAD}" y="46" font-size="34" font-weight="600"
     letter-spacing="6" fill="#000000">HANS</text>`)
-  push(`<text x="${SCREEN_W - PAD}" y="46" font-size="18" text-anchor="end"
+  // The battery pill claims the right edge; the timestamp shifts left to clear
+  // it rather than trying to measure text width in a headless renderer.
+  const stampRight = batteryPct === null ? SCREEN_W - PAD : SCREEN_W - PAD - 106
+  push(`<text x="${stampRight}" y="46" font-size="18" text-anchor="end"
     fill="${d.stale && !mono ? '#FF0000' : '#000000'}">${esc(
       d.stale ? `stale · ${formatStamp(d.updatedAt)}` : formatStamp(d.updatedAt),
     )}</text>`)
+  if (batteryPct !== null) push(battery(batteryPct, SCREEN_W - PAD - 72, 46, mono))
   push(`<rect x="${PAD}" y="66" width="${SCREEN_W - PAD * 2}" height="3" fill="${RULE}"/>`)
 
   // ── Hero: house average ───────────────────────────────────────────────────
