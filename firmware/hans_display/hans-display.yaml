@@ -16,7 +16,7 @@ substitutions:
   device_name: hans-display
   # Sparrow id this panel reports its own SHT4x readings under. Must exist in
   # the devices table before Supabase will accept the inserts.
-  sparrow_id: hallway_display
+  sparrow_id: hallway
 
 esphome:
   name: ${device_name}
