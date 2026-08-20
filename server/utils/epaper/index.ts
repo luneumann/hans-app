@@ -1,10 +1,10 @@
 import type { H3Event } from 'h3'
 import { fetchEpaperData } from './data'
-import { buildSvg } from './layout'
+import { buildSvg, isLayoutName, type LayoutName } from './layout'
 import { isPaletteName, type PaletteName } from './palette'
 
 export { svgToPng, SCREEN_W, SCREEN_H } from './render'
-export { buildSvg } from './layout'
+export { buildSvg, LAYOUTS, isLayoutName, type LayoutName } from './layout'
 export { fetchEpaperData, deriveEpaperData } from './data'
 
 /**
@@ -32,6 +32,9 @@ export async function epaperPayload(event: H3Event): Promise<{ svg: string; pale
   const raw = Number(query.battery)
   const battery = Number.isFinite(raw) ? Math.round(Math.min(100, Math.max(0, raw))) : null
 
+  const wanted = String(query.layout ?? 'dashboard')
+  const layout: LayoutName = isLayoutName(wanted) ? wanted : 'dashboard'
+
   const data = await fetchEpaperData()
-  return { svg: buildSvg(data, palette, battery), palette }
+  return { svg: buildSvg(data, palette, battery, layout), palette }
 }

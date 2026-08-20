@@ -1,39 +1,47 @@
-import type { EpaperData } from './data'
+import type { EpaperData, Room } from './data'
 import type { ComfortTone } from '../../../app/composables/useComfort'
 import type { PaletteName } from './palette'
 import { SCREEN_W, SCREEN_H } from './render'
 
 /**
- * The 800x480 panel layout.
+ * Panel layouts.
  *
- * Two rules drive every choice here. There are six colours and no greys, so
- * colour has to carry meaning (comfort verdict, indoor vs. outdoor) and never
+ * Two constraints shape all of them. There are six colours and no greys, so
+ * colour carries meaning (comfort verdict, indoor vs. outdoor) and never
  * decoration — a tint would come out as dither noise. And text is always pure
- * black on pure white: any other combination halftones, which at 17 px is
+ * black on pure white: any other pairing halftones, which at 17 px is
  * unreadable from across the room.
  */
 
+export const LAYOUTS = ['dashboard', 'focus', 'grid'] as const
+export type LayoutName = (typeof LAYOUTS)[number]
+
+export function isLayoutName(v: string): v is LayoutName {
+  return (LAYOUTS as readonly string[]).includes(v)
+}
+
 const PAD = 32
 const RULE = '#000000'
+const FONT = 'Geist, Helvetica Neue, Helvetica, Arial, sans-serif'
 
 const TONE_FILL: Record<ComfortTone, string> = {
-  good: '#00FF00',
-  warn: '#FFFF00',
-  bad: '#FF0000',
-  neutral: '#FFFFFF',
+  good: '#00FF00', warn: '#FFFF00', bad: '#FF0000', neutral: '#FFFFFF',
 }
 // Red is the only primary dark enough to need knocked-out text.
 const TONE_INK: Record<ComfortTone, string> = {
-  good: '#000000',
-  warn: '#000000',
-  bad: '#FFFFFF',
-  neutral: '#000000',
+  good: '#000000', warn: '#000000', bad: '#FFFFFF', neutral: '#000000',
+}
+
+interface Ctx {
+  mono: boolean
+  accent: string
+  push: (s: string) => void
 }
 
 /**
  * On a two-colour panel every tint becomes a 50 % dither, which swallows any
- * text sitting on it. So mono drops colour entirely and encodes the verdict as
- * fill weight instead: bad inverts to solid black, everything else stays paper.
+ * text sitting on it. Mono therefore drops colour and encodes the verdict as
+ * fill weight: bad inverts to solid black, everything else stays paper.
  */
 function toneFill(tone: ComfortTone, mono: boolean): string {
   if (!mono) return TONE_FILL[tone]
@@ -43,13 +51,11 @@ function toneInk(tone: ComfortTone, mono: boolean): string {
   if (!mono) return TONE_INK[tone]
   return tone === 'bad' ? '#FFFFFF' : '#000000'
 }
-/** Half-height bar that marks `warn` in mono, where yellow is unavailable. */
+/** Half-height bar marking `warn` in mono, where yellow is unavailable. */
 function toneHatch(tone: ComfortTone, mono: boolean, x: number, y: number, size: number): string {
   if (!mono || tone !== 'warn') return ''
   return `<rect x="${x}" y="${y + size / 2}" width="${size}" height="${size / 2}" fill="#000000"/>`
 }
-
-const FONT = 'Geist, Helvetica Neue, Helvetica, Arial, sans-serif'
 
 function esc(s: string): string {
   return s.replace(/[<>&'"]/g, c => (
@@ -68,6 +74,29 @@ function formatStamp(d: Date | null): string {
   }).replace(',', ' ·')
 }
 
+/** Small caps label. Deliberately tiny — the number is the content. */
+function label(text: string, x: number, y: number, fill = '#000000', anchor = 'start'): string {
+  return `<text x="${x}" y="${y}" font-size="13" letter-spacing="2" text-anchor="${anchor}"
+    fill="${fill}">${esc(text.toUpperCase())}</text>`
+}
+
+/**
+ * Battery pill. The panel is the only thing that knows its own charge, so it
+ * passes the value in on the URL; absent means "not reported".
+ */
+function battery(pct: number, x: number, y: number, mono: boolean): string {
+  const w = 34, h = 16
+  const fill = pct <= 15 && !mono ? '#FF0000' : '#000000'
+  const inner = Math.max(1, Math.round((w - 6) * Math.min(100, Math.max(0, pct)) / 100))
+  return [
+    `<rect x="${x}" y="${y - h + 3}" width="${w}" height="${h}" rx="3"
+      fill="#FFFFFF" stroke="#000000" stroke-width="2"/>`,
+    `<rect x="${x + w + 1}" y="${y - h + 8}" width="3" height="6" fill="#000000"/>`,
+    `<rect x="${x + 3}" y="${y - h + 6}" width="${inner}" height="${h - 6}" fill="${fill}"/>`,
+    `<text x="${x + w + 12}" y="${y}" font-size="18" fill="#000000">${pct} %</text>`,
+  ].join('')
+}
+
 /** Polyline through the series, fitted to the given box. */
 function sparkline(series: number[], x: number, y: number, w: number, h: number, stroke: string): string {
   if (series.length < 2) return ''
@@ -83,115 +112,211 @@ function sparkline(series: number[], x: number, y: number, w: number, h: number,
     stroke-linejoin="round" stroke-linecap="round"/>`
 }
 
-/**
- * Battery pill for the header. The panel is the only thing that knows its own
- * charge, so it passes the value in on the URL; absent means "not reported"
- * and the header simply falls back to the timestamp alone.
- */
-function battery(pct: number, x: number, y: number, mono: boolean): string {
-  const w = 34, h = 16
-  const fill = pct <= 15 && !mono ? '#FF0000' : '#000000'
-  const inner = Math.max(1, Math.round((w - 6) * Math.min(100, Math.max(0, pct)) / 100))
-  return [
-    `<rect x="${x}" y="${y - h + 3}" width="${w}" height="${h}" rx="3"
-      fill="#FFFFFF" stroke="#000000" stroke-width="2"/>`,
-    `<rect x="${x + w + 1}" y="${y - h + 8}" width="3" height="6" fill="#000000"/>`,
-    `<rect x="${x + 3}" y="${y - h + 6}" width="${inner}" height="${h - 6}" fill="${fill}"/>`,
-    `<text x="${x + w + 12}" y="${y}" font-size="18" fill="#000000">${pct} %</text>`,
-  ].join('')
-}
-
-export function buildSvg(
-  d: EpaperData,
-  palette: PaletteName = 'spectra6',
-  batteryPct: number | null = null,
-): string {
-  const mono = palette === 'mono'
-  const accent = mono ? '#000000' : '#0000FF'
-  const parts: string[] = []
-  const push = (s: string) => parts.push(s)
-
-  push(`<rect width="${SCREEN_W}" height="${SCREEN_H}" fill="#FFFFFF"/>`)
-
-  // ── Header ────────────────────────────────────────────────────────────────
-  push(`<text x="${PAD}" y="46" font-size="34" font-weight="600"
+function header(d: EpaperData, batteryPct: number | null, ctx: Ctx): void {
+  ctx.push(`<text x="${PAD}" y="46" font-size="30" font-weight="600"
     letter-spacing="6" fill="#000000">HANS</text>`)
   // The battery pill claims the right edge; the timestamp shifts left to clear
-  // it rather than trying to measure text width in a headless renderer.
+  // it rather than measuring text width in a headless renderer.
   const stampRight = batteryPct === null ? SCREEN_W - PAD : SCREEN_W - PAD - 106
-  push(`<text x="${stampRight}" y="46" font-size="18" text-anchor="end"
-    fill="${d.stale && !mono ? '#FF0000' : '#000000'}">${esc(
+  ctx.push(`<text x="${stampRight}" y="46" font-size="17" text-anchor="end"
+    fill="${d.stale && !ctx.mono ? '#FF0000' : '#000000'}">${esc(
       d.stale ? `stale · ${formatStamp(d.updatedAt)}` : formatStamp(d.updatedAt),
     )}</text>`)
-  if (batteryPct !== null) push(battery(batteryPct, SCREEN_W - PAD - 72, 46, mono))
-  push(`<rect x="${PAD}" y="66" width="${SCREEN_W - PAD * 2}" height="3" fill="${RULE}"/>`)
+  if (batteryPct !== null) ctx.push(battery(batteryPct, SCREEN_W - PAD - 72, 46, ctx.mono))
+  ctx.push(`<rect x="${PAD}" y="64" width="${SCREEN_W - PAD * 2}" height="3" fill="${RULE}"/>`)
+}
 
-  // ── Hero: house average ───────────────────────────────────────────────────
+// ─── dashboard ───────────────────────────────────────────────────────────────
+// The original: house average plus a full room list. Most information, least
+// legible from a distance.
+
+function layoutDashboard(d: EpaperData, ctx: Ctx): void {
+  const { push, mono, accent } = ctx
+
   push(`<text x="${PAD}" y="196" font-size="124" font-weight="300"
     fill="#000000">${esc(num(d.house.temp))}°</text>`)
   push(`<text x="${PAD}" y="238" font-size="22" fill="#000000">${esc(
     `${num(d.house.humidity, 0)} % rel · dew point ${num(d.house.dew)}°`,
   )}</text>`)
 
-  // Comfort verdict. The only place a score and a colour appear together.
   const badgeY = 268
   push(`<rect x="${PAD}" y="${badgeY}" width="380" height="88" rx="10"
     fill="${toneFill(d.house.tone, mono)}" stroke="${RULE}" stroke-width="3"/>`)
   push(`<text x="${PAD + 26}" y="${badgeY + 62}" font-size="52" font-weight="600"
     fill="${toneInk(d.house.tone, mono)}">${d.house.score ?? '--'}</text>`)
-  push(`<text x="${PAD + 128}" y="${badgeY + 40}" font-size="17" letter-spacing="2"
-    fill="${toneInk(d.house.tone, mono)}">COMFORT</text>`)
+  push(label('comfort', PAD + 128, badgeY + 40, toneInk(d.house.tone, mono)))
   push(`<text x="${PAD + 128}" y="${badgeY + 68}" font-size="26"
     fill="${toneInk(d.house.tone, mono)}">${esc(d.house.label)}</text>`)
 
-  // ── Room column ───────────────────────────────────────────────────────────
   const colX = 470
-  push(`<rect x="${colX}" y="66" width="3" height="${372 - 66}" fill="${RULE}"/>`)
-
+  push(`<rect x="${colX}" y="64" width="3" height="${372 - 64}" fill="${RULE}"/>`)
   const listX = colX + 26
   const rightX = SCREEN_W - PAD
   const rows = d.rooms.slice(0, 5)
   const rowH = rows.length > 4 ? 56 : 66
   rows.forEach((room, i) => {
     const y = 128 + i * rowH
-    // Tone square rather than a coloured label: keeps the type pure black.
     push(`<rect x="${listX}" y="${y - 15}" width="16" height="16"
       fill="${toneFill(room.tone, mono)}" stroke="${RULE}" stroke-width="2"/>`)
     push(toneHatch(room.tone, mono, listX, y - 15, 16))
-    push(`<text x="${listX + 28}" y="${y}" font-size="22"
-      fill="#000000">${esc(room.name)}</text>`)
+    push(`<text x="${listX + 28}" y="${y}" font-size="22" fill="#000000">${esc(room.name)}</text>`)
     push(`<text x="${rightX}" y="${y}" font-size="26" text-anchor="end"
       fill="#000000">${esc(num(room.temp))}°</text>`)
     push(`<text x="${rightX}" y="${y + 22}" font-size="16" text-anchor="end"
       fill="#000000">${esc(num(room.humidity, 0))} %</text>`)
   })
-  if (!rows.length) {
-    push(`<text x="${listX}" y="140" font-size="20" fill="#000000">no sensors reporting</text>`)
-  }
+  if (!rows.length) push(`<text x="${listX}" y="140" font-size="20" fill="#000000">no sensors reporting</text>`)
 
-  // ── Bottom band: 24 h trend + outdoor ─────────────────────────────────────
   push(`<rect x="${PAD}" y="386" width="${SCREEN_W - PAD * 2}" height="3" fill="${RULE}"/>`)
-
-  push(`<text x="${PAD}" y="414" font-size="14" letter-spacing="2"
-    fill="#000000">INDOOR · 24 H</text>`)
+  push(label('indoor · 24 h', PAD, 414))
   push(sparkline(d.series, PAD, 424, 320, 38, accent))
   if (d.series.length >= 2) {
     const lo = Math.min(...d.series), hi = Math.max(...d.series)
-    push(`<text x="${PAD + 336}" y="440" font-size="16"
-      fill="#000000">${esc(`${num(hi)}° high`)}</text>`)
-    push(`<text x="${PAD + 336}" y="462" font-size="16"
-      fill="#000000">${esc(`${num(lo)}° low`)}</text>`)
+    push(`<text x="${PAD + 336}" y="440" font-size="16" fill="#000000">${esc(`${num(hi)}° high`)}</text>`)
+    push(`<text x="${PAD + 336}" y="462" font-size="16" fill="#000000">${esc(`${num(lo)}° low`)}</text>`)
   }
-
   if (d.outdoor) {
     push(`<rect x="${colX}" y="386" width="3" height="${SCREEN_H - 386}" fill="${RULE}"/>`)
-    push(`<text x="${listX}" y="414" font-size="14" letter-spacing="2"
-      fill="${accent}">OUTDOOR · ${esc(d.outdoor.name.toUpperCase())}</text>`)
-    push(`<text x="${listX}" y="458" font-size="34"
-      fill="#000000">${esc(num(d.outdoor.temp))}°</text>`)
+    push(label(`outdoor · ${d.outdoor.name}`, listX, 414, accent))
+    push(`<text x="${listX}" y="458" font-size="34" fill="#000000">${esc(num(d.outdoor.temp))}°</text>`)
     push(`<text x="${rightX}" y="458" font-size="24" text-anchor="end"
       fill="#000000">${esc(num(d.outdoor.humidity, 0))} %</text>`)
   }
+}
+
+// ─── focus ───────────────────────────────────────────────────────────────────
+// One number owns the screen. Everything that explains where it came from is
+// demoted to the footer, at the smallest size that still reads up close.
+
+function layoutFocus(d: EpaperData, ctx: Ctx): void {
+  const { push, mono, accent } = ctx
+  const rightX = SCREEN_W - PAD
+
+  push(`<text x="${PAD}" y="252" font-size="168" font-weight="300"
+    fill="#000000">${esc(num(d.house.temp))}°</text>`)
+  push(`<text x="${PAD + 4}" y="296" font-size="20" fill="#000000">${esc(
+    `dew point ${num(d.house.dew)}° · ${d.house.label}`,
+  )}</text>`)
+
+  const colX = 516
+  push(label('humidity', colX, 140))
+  push(`<text x="${colX}" y="208" font-size="76" font-weight="300"
+    fill="#000000">${esc(num(d.house.humidity, 0))} %</text>`)
+
+  push(label('comfort', colX, 266))
+  push(`<rect x="${colX}" y="286" width="52" height="52" rx="8"
+    fill="${toneFill(d.house.tone, mono)}" stroke="${RULE}" stroke-width="3"/>`)
+  push(toneHatch(d.house.tone, mono, colX, 286, 52))
+  push(`<text x="${colX + 70}" y="334" font-size="76" font-weight="300"
+    fill="#000000">${d.house.score ?? '--'}</text>`)
+
+  push(`<rect x="${PAD}" y="366" width="${SCREEN_W - PAD * 2}" height="3" fill="${RULE}"/>`)
+
+  const divX = 470
+  push(label('rooms', PAD, 396))
+  d.rooms.slice(0, 2).forEach((room, i) => {
+    const y = 430 + i * 32
+    push(`<text x="${PAD}" y="${y}" font-size="19" fill="#000000">${esc(room.name)}</text>`)
+    push(`<text x="${divX - 40}" y="${y}" font-size="24" text-anchor="end"
+      fill="#000000">${esc(num(room.temp))}°</text>`)
+  })
+
+  if (d.outdoor) {
+    push(`<rect x="${divX}" y="366" width="3" height="${SCREEN_H - 366}" fill="${RULE}"/>`)
+    push(label(`outdoor · ${d.outdoor.name}`, divX + 26, 396, accent))
+    push(`<text x="${divX + 26}" y="452" font-size="52" font-weight="300"
+      fill="#000000">${esc(num(d.outdoor.temp))}°</text>`)
+    push(`<text x="${rightX}" y="452" font-size="24" text-anchor="end"
+      fill="#000000">${esc(num(d.outdoor.humidity, 0))} %</text>`)
+  }
+}
+
+// ─── grid ────────────────────────────────────────────────────────────────────
+// Per-room numbers at a size worth walking past. No averaging — you read the
+// room you care about. Columns adapt so two sensors do not look like a
+// half-empty table.
+
+function layoutGrid(d: EpaperData, ctx: Ctx): void {
+  const { push, mono, accent } = ctx
+
+  interface Cell { name: string; temp: number | null; humidity: number | null; tone: ComfortTone; outdoor: boolean }
+  const cells: Cell[] = d.rooms.map((r: Room) => ({
+    name: r.name, temp: r.temp, humidity: r.humidity, tone: r.tone, outdoor: false,
+  }))
+  if (d.outdoor) {
+    cells.push({
+      name: d.outdoor.name, temp: d.outdoor.temp, humidity: d.outdoor.humidity,
+      tone: 'neutral', outdoor: true,
+    })
+  }
+  if (!cells.length) {
+    push(`<text x="${PAD}" y="200" font-size="26" fill="#000000">no sensors reporting</text>`)
+    return
+  }
+
+  const top = 92, bottom = 396
+  const cols = Math.min(cells.length, 3)
+  const rowCount = Math.ceil(cells.length / cols)
+  const cellW = (SCREEN_W - PAD * 2) / cols
+  const cellH = (bottom - top) / rowCount
+  const tempSize = rowCount === 1 ? 92 : 62
+
+  // Label, number and humidity as one block, centred in the cell — otherwise a
+  // single row leaves the numbers stranded against the top rule.
+  const contentH = 26 + tempSize + 34
+  cells.forEach((cell, i) => {
+    const cx = PAD + (i % cols) * cellW
+    const cy = top + Math.floor(i / cols) * cellH + Math.max(0, (cellH - contentH) / 2) - 8
+
+    if (i % cols !== 0) {
+      push(`<rect x="${cx - 2}" y="${cy + 8}" width="3" height="${cellH - 24}" fill="${RULE}"/>`)
+    }
+    push(label(cell.name, cx + 22, cy + 26, cell.outdoor ? accent : '#000000'))
+    if (!cell.outdoor) {
+      push(`<rect x="${cx + 22}" y="${cy + 38}" width="14" height="14"
+        fill="${toneFill(cell.tone, mono)}" stroke="${RULE}" stroke-width="2"/>`)
+      push(toneHatch(cell.tone, mono, cx + 22, cy + 38, 14))
+    }
+    push(`<text x="${cx + 22}" y="${cy + 44 + tempSize}" font-size="${tempSize}"
+      font-weight="300" fill="#000000">${esc(num(cell.temp))}°</text>`)
+    push(`<text x="${cx + 26}" y="${cy + 78 + tempSize}" font-size="22"
+      fill="#000000">${esc(num(cell.humidity, 0))} % rel</text>`)
+  })
+
+  push(`<rect x="${PAD}" y="${bottom + 8}" width="${SCREEN_W - PAD * 2}" height="3" fill="${RULE}"/>`)
+  push(label('house', PAD, 436))
+  push(`<text x="${PAD + 92}" y="442" font-size="32" font-weight="300" fill="#000000">${esc(
+    `${num(d.house.temp)}°  ·  ${num(d.house.humidity, 0)} %`,
+  )}</text>`)
+  push(`<rect x="${SCREEN_W - PAD - 148}" y="412" width="40" height="40" rx="6"
+    fill="${toneFill(d.house.tone, mono)}" stroke="${RULE}" stroke-width="3"/>`)
+  push(toneHatch(d.house.tone, mono, SCREEN_W - PAD - 148, 412, 40))
+  push(`<text x="${SCREEN_W - PAD}" y="444" font-size="34" font-weight="300"
+    text-anchor="end" fill="#000000">${d.house.score ?? '--'}</text>`)
+}
+
+const RENDERERS: Record<LayoutName, (d: EpaperData, ctx: Ctx) => void> = {
+  dashboard: layoutDashboard,
+  focus: layoutFocus,
+  grid: layoutGrid,
+}
+
+export function buildSvg(
+  d: EpaperData,
+  palette: PaletteName = 'spectra6',
+  batteryPct: number | null = null,
+  layout: LayoutName = 'dashboard',
+): string {
+  const parts: string[] = []
+  const ctx: Ctx = {
+    mono: palette === 'mono',
+    accent: palette === 'mono' ? '#000000' : '#0000FF',
+    push: (s: string) => parts.push(s),
+  }
+
+  ctx.push(`<rect width="${SCREEN_W}" height="${SCREEN_H}" fill="#FFFFFF"/>`)
+  header(d, batteryPct, ctx)
+  RENDERERS[layout](d, ctx)
 
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${SCREEN_W}" height="${SCREEN_H}"
     viewBox="0 0 ${SCREEN_W} ${SCREEN_H}" font-family="${FONT}">${parts.join('')}</svg>`

@@ -40,6 +40,20 @@ export interface EpaperData {
 
 const WINDOW_HOURS = 24
 
+/**
+ * Sensors that keep recording but stay off the panel.
+ *
+ * `hallway` is the display's own SHT4x, sitting inside a warm enclosure and
+ * reading several degrees above the room. It stands in the open space that
+ * `living` also covers, so whether the two track linearly — or are simply not
+ * comparable — is worth measuring properly later. Until then it would only
+ * skew the house average that the hero number shows.
+ *
+ * This hides it from the display only; the inserts continue, so the history
+ * needed for that comparison keeps accumulating.
+ */
+const HIDDEN_SPARROWS = new Set(['hallway'])
+
 function prettyName(id: string): string {
   const s = id.replace(/[_-]+/g, ' ').trim()
   return s.charAt(0).toUpperCase() + s.slice(1)
@@ -77,6 +91,7 @@ export async function fetchEpaperData(): Promise<EpaperData> {
 
 /** Pure shaping step, split out so it can be exercised without a database. */
 export function deriveEpaperData(rows: Reading[]): EpaperData {
+  rows = rows.filter(r => !HIDDEN_SPARROWS.has(r.sparrow_id))
   const ids = [...new Set(rows.map(r => r.sparrow_id))].sort()
 
   const latest = (id: string, metric: string): number | null => {
