@@ -1,4 +1,4 @@
-import { createClient } from '@supabase/supabase-js'
+import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 import {
   comfortScore, comfortLabel, dewPoint, feelsLike, isOutdoorSparrow,
   type ComfortTone,
@@ -41,6 +41,38 @@ export interface EpaperData {
 const WINDOW_HOURS = 24
 
 /**
+ * PostgREST caps a single response at roughly 10 000 rows regardless of the
+ * `limit` asked for, and it truncates silently — no error, just a short array.
+ * A week of readings is well past that, so the window has to be walked in
+ * pages or the oldest days simply vanish.
+ */
+const PAGE_SIZE = 9000
+
+async function fetchReadings(
+  supabase: SupabaseClient,
+  sinceIso: string,
+  maxRows: number,
+): Promise<Reading[]> {
+  const out: Reading[] = []
+  for (let from = 0; from < maxRows; from += PAGE_SIZE) {
+    const { data, error } = await supabase
+      .from('sensor_readings')
+      .select('sparrow_id, metric, value, recorded_at')
+      .gte('recorded_at', sinceIso)
+      .in('metric', ['temperature', 'humidity'])
+      // Newest first so a short final page trims the far end of the window,
+      // never the present. Reversed once the whole range is in hand.
+      .order('recorded_at', { ascending: false })
+      .range(from, from + PAGE_SIZE - 1)
+    if (error) throw error
+    const rows = (data ?? []) as Reading[]
+    out.push(...rows)
+    if (rows.length < PAGE_SIZE) break
+  }
+  return out.reverse()
+}
+
+/**
  * Sensors that keep recording but stay off the panel.
  *
  * `hallway` is the display's own SHT4x, sitting inside a warm enclosure and
@@ -76,17 +108,7 @@ export async function fetchEpaperData(): Promise<EpaperData> {
   const supabase = createClient(url, key, { auth: { persistSession: false } })
   const since = new Date(Date.now() - WINDOW_HOURS * 60 * 60 * 1000).toISOString()
 
-  const { data, error } = await supabase
-    .from('sensor_readings')
-    .select('sparrow_id, metric, value, recorded_at')
-    .gte('recorded_at', since)
-    .in('metric', ['temperature', 'humidity'])
-    .order('recorded_at', { ascending: true })
-    .limit(50000)
-  if (error) throw error
-
-  const rows = (data ?? []) as Reading[]
-  return deriveEpaperData(rows)
+  return deriveEpaperData(await fetchReadings(supabase, since, 27000))
 }
 
 /** Pure shaping step, split out so it can be exercised without a database. */
@@ -176,4 +198,111 @@ function buildSeries(rows: Reading[], buckets = 96): number[] {
     if (last !== null) out.push(last)
   }
   return out
+}
+
+// ─── Comfort rhythm ──────────────────────────────────────────────────────────
+
+/**
+ * Hue encodes the *direction* of discomfort, not just its amount.
+ *
+ * A six-colour panel cannot render the web app's continuous gradient, so
+ * rather than fake one, the scale splits `bad` into its two causes. Knowing
+ * the bedroom goes cold at 04:00 and the kitchen goes warm at 19:00 is the
+ * whole point of looking at a week at once; a single "poor" colour would hide
+ * exactly that.
+ */
+export type RhythmTone = 'good' | 'warn' | 'cold' | 'hot' | 'none'
+
+export interface RhythmData {
+  /** Seven days, oldest first, 24 hourly cells each. */
+  days: { label: string; cells: RhythmTone[] }[]
+  updatedAt: Date | null
+  stale: boolean
+}
+
+const RHYTHM_DAYS = 7
+
+export async function fetchRhythmData(): Promise<RhythmData> {
+  const url = process.env.SUPABASE_URL
+  const key = process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_KEY
+  if (!url || !key) throw new Error('SUPABASE_URL / SUPABASE_SERVICE_KEY are not set')
+
+  const supabase = createClient(url, key, { auth: { persistSession: false } })
+  const since = new Date(Date.now() - RHYTHM_DAYS * 24 * 60 * 60 * 1000).toISOString()
+
+  // Headroom over the ~12 000 rows a week currently produces, so adding
+  // sensors does not quietly start clipping the oldest row again.
+  return deriveRhythmData(await fetchReadings(supabase, since, 45000))
+}
+
+/**
+ * Berlin's offset from UTC, in minutes, as of now.
+ *
+ * Applied uniformly across the window rather than per row — resolving the zone
+ * 20 000 times would dominate the request. The cost is that the one week a
+ * year containing a DST switch is skewed by an hour on the far side of it.
+ */
+function berlinOffsetMinutes(): number {
+  const now = new Date()
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'Europe/Berlin', hour12: false,
+    year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit',
+  }).formatToParts(now)
+  const get = (t: string) => Number(parts.find(p => p.type === t)!.value)
+  const asUtc = Date.UTC(get('year'), get('month') - 1, get('day'), get('hour'), get('minute'))
+  return Math.round((asUtc - now.getTime()) / 60000)
+}
+
+export function deriveRhythmData(rows: Reading[]): RhythmData {
+  // Outdoor readings would drag the comfort picture around, and the panel's
+  // own sensor is excluded for the same reason it is hidden elsewhere.
+  rows = rows.filter(r => !HIDDEN_SPARROWS.has(r.sparrow_id) && !isOutdoorSparrow(r.sparrow_id))
+
+  const offset = berlinOffsetMinutes() * 60000
+  const local = (iso: string) => new Date(new Date(iso).getTime() + offset)
+
+  const todayLocal = new Date(Date.now() + offset)
+  const dayKey = (d: Date) => `${d.getUTCFullYear()}-${d.getUTCMonth()}-${d.getUTCDate()}`
+
+  // One bucket per (day, hour), averaging every indoor sensor reporting in it.
+  const buckets = new Map<string, { t: number[]; h: number[] }>()
+  for (const r of rows) {
+    const d = local(r.recorded_at)
+    const k = `${dayKey(d)}|${d.getUTCHours()}`
+    let b = buckets.get(k)
+    if (!b) { b = { t: [], h: [] }; buckets.set(k, b) }
+    if (r.metric === 'temperature') b.t.push(r.value)
+    else b.h.push(r.value)
+  }
+
+  const avg = (v: number[]) => (v.length ? v.reduce((a, b) => a + b, 0) / v.length : null)
+
+  const days: RhythmData['days'] = []
+  for (let back = RHYTHM_DAYS - 1; back >= 0; back--) {
+    const d = new Date(todayLocal.getTime() - back * 24 * 60 * 60 * 1000)
+    const cells: RhythmTone[] = []
+    for (let hour = 0; hour < 24; hour++) {
+      const b = buckets.get(`${dayKey(d)}|${hour}`)
+      const T = b ? avg(b.t) : null
+      const RH = b ? avg(b.h) : null
+      if (T === null || RH === null) { cells.push('none'); continue }
+      const { tone } = comfortLabel(T, RH)
+      if (tone === 'good') cells.push('good')
+      else if (tone === 'warn') cells.push('warn')
+      else cells.push(T < 21.5 ? 'cold' : 'hot')
+    }
+    days.push({
+      label: d.toLocaleDateString('en-GB', { weekday: 'short', timeZone: 'UTC' }),
+      cells,
+    })
+  }
+
+  const lastIso = rows.length ? rows[rows.length - 1].recorded_at : null
+  const updatedAt = lastIso ? new Date(lastIso) : null
+  return {
+    days,
+    updatedAt,
+    stale: !updatedAt || Date.now() - updatedAt.getTime() > 60 * 60 * 1000,
+  }
 }

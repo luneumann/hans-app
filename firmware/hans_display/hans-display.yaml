@@ -91,13 +91,21 @@ i2c:
 
 # The panel is the only thing that can measure its own charge, so it appends
 # the value to the request and the server draws it into the header.
+# A plain counter, not a page name. The server takes it modulo however many
+# pages exist, so adding a page never means reflashing the panel.
+globals:
+  - id: page_index
+    type: int
+    restore_value: false
+    initial_value: '0'
+
 script:
   - id: refresh_dashboard
     then:
       - lambda: |-
           char url[256];
-          snprintf(url, sizeof(url), "${dashboard_url}&battery=%d",
-                   (int) roundf(id(battery_level).state));
+          snprintf(url, sizeof(url), "${dashboard_url}&battery=%d&page=%d",
+                   (int) roundf(id(battery_level).state), id(page_index));
           id(dashboard_image).set_url(url);
       - component.update: dashboard_image
 
@@ -138,7 +146,7 @@ time:
     timezone: Europe/Berlin
     on_time:
       - seconds: 0
-        minutes: /30
+        minutes: /15
         then:
           - if:
               condition:
@@ -240,6 +248,28 @@ output:
     id: battery_enable
 
 binary_sensor:
+  # Left and right buttons page through the layouts; the middle one just
+  # re-fetches the page currently shown.
+  - platform: gpio
+    pin:
+      number: GPIO3
+      mode: INPUT_PULLUP
+      inverted: true
+    name: Page Up
+    on_press:
+      - lambda: 'id(page_index) -= 1;'
+      - script.execute: refresh_dashboard
+
+  - platform: gpio
+    pin:
+      number: GPIO4
+      mode: INPUT_PULLUP
+      inverted: true
+    name: Page Down
+    on_press:
+      - lambda: 'id(page_index) += 1;'
+      - script.execute: refresh_dashboard
+
   - platform: gpio
     pin:
       number: GPIO5
