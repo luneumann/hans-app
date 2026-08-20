@@ -17,7 +17,7 @@ export default defineNuxtConfig({
     // listen on more than loopback. By default Nuxt binds HTTP to ::1 and
     // leaves only a WebSocket socket on the wildcard address, which answers
     // plain GETs with 426 Upgrade Required.
-    host: '0.0.0.0',
+    host: '::',
   },
   vite: {
     server: {
