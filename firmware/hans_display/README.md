@@ -20,18 +20,21 @@ Verified against ESPHome 2026.8.0.
 
 ## 3. Fill in the secrets
 
+`secrets.yaml` is git-ignored, so it does not exist in a fresh checkout:
+
 ```bash
 cp firmware/hans_display/secrets.yaml.example firmware/hans_display/secrets.yaml
 ```
 
+Everything in it can be derived except the Wi-Fi credentials. Note that
 `hans_dashboard_url` has to be reachable *from the device*, so during bring-up
-point it at your Mac's LAN address, not `localhost`:
-
-```bash
-ipconfig getifaddr en0
-```
+it points at this Mac's LAN address (`ipconfig getifaddr en0`), never
+`localhost`. The token there must match `EPAPER_TOKEN` in `.env`.
 
 Generate the API key with `python3 -c "import base64,os;print(base64.b64encode(os.urandom(32)).decode())"`.
+
+The dev server has to be running and reachable while the panel refreshes —
+`npm run dev`, with `DEV_ALLOWED_HOSTS` in `.env` naming the LAN IP.
 
 ## 4. Flash over USB
 
@@ -78,6 +81,11 @@ has recent rows.
 **Nothing appears and the log shows a fetch error.** The last frame stays on
 screen by design. Check the Mac is reachable on the LAN (macOS firewall blocks
 incoming connections by default) and that the token matches `EPAPER_TOKEN`.
+
+**The endpoint answers `426 Upgrade Required` over the LAN.** The dev server is
+bound to loopback only, leaving a WebSocket-only socket on the wildcard address
+that rejects plain GETs. `devServer.host` in `nuxt.config.ts` handles this;
+check it survived if you see a 426 where localhost returns 200.
 
 **Text renders in a fallback face.** resvg only loads fonts from disk. Drop
 `.ttf` files into `server/assets/fonts/` and they get picked up; without them

@@ -12,6 +12,21 @@ export default defineNuxtConfig({
     },
   },
   css: ['~/assets/css/main.css'],
+  devServer: {
+    // The e-paper panel pulls its frame over the LAN, so the dev server has to
+    // listen on more than loopback. By default Nuxt binds HTTP to ::1 and
+    // leaves only a WebSocket socket on the wildcard address, which answers
+    // plain GETs with 426 Upgrade Required.
+    host: '0.0.0.0',
+  },
+  vite: {
+    server: {
+      // Vite rejects unknown Host headers as DNS-rebinding protection; the
+      // panel addresses this machine by IP. Dev only — the deployed app runs
+      // on Nitro, which has no such check.
+      allowedHosts: (process.env.DEV_ALLOWED_HOSTS ?? '').split(',').filter(Boolean),
+    },
+  },
   compatibilityDate: '2025-07-15',
   devtools: { enabled: true },
   modules: ['@nuxtjs/supabase', '@nuxt/ui'],
