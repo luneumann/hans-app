@@ -96,14 +96,35 @@ function mean(vals: number[]): number | null {
   return vals.reduce((a, b) => a + b, 0) / vals.length
 }
 
+/**
+ * The key these routes read with.
+ *
+ * The anon key is INSERT-only under RLS (see firmware/sparrow_sensor) — the
+ * browser app reads through a logged-in session, which the panel has no way to
+ * hold. So a service role key is required, and both spellings in circulation
+ * are accepted: Supabase's dashboard calls it `service_role`, and this project
+ * shortened it at first.
+ *
+ * Falling back to the anon key keeps the route answering, but PostgREST will
+ * return an empty set rather than an error — data that looks merely missing.
+ * The warning is the only place that distinction surfaces.
+ */
+function serviceKey(): string | undefined {
+  const service = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY
+  if (service) return service
+  if (process.env.SUPABASE_KEY) {
+    console.warn(
+      '[epaper] no service role key set — falling back to the anon key, which ' +
+      'RLS restricts to INSERT. Readings will come back empty.',
+    )
+  }
+  return process.env.SUPABASE_KEY
+}
+
 export async function fetchEpaperData(): Promise<EpaperData> {
   const url = process.env.SUPABASE_URL
-  // The anon key is INSERT-only under RLS (see firmware/sparrow_sensor) — the
-  // browser app reads through a logged-in session, which the panel has no way
-  // to hold. So this route reads with the service key, which is why it must
-  // stay server-side and behind EPAPER_TOKEN.
-  const key = process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_KEY
-  if (!url || !key) throw new Error('SUPABASE_URL / SUPABASE_SERVICE_KEY are not set')
+  const key = serviceKey()
+  if (!url || !key) throw new Error('SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY are not set')
 
   const supabase = createClient(url, key, { auth: { persistSession: false } })
   const since = new Date(Date.now() - WINDOW_HOURS * 60 * 60 * 1000).toISOString()
@@ -224,8 +245,8 @@ const RHYTHM_DAYS = 7
 
 export async function fetchRhythmData(): Promise<RhythmData> {
   const url = process.env.SUPABASE_URL
-  const key = process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_KEY
-  if (!url || !key) throw new Error('SUPABASE_URL / SUPABASE_SERVICE_KEY are not set')
+  const key = serviceKey()
+  if (!url || !key) throw new Error('SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY are not set')
 
   const supabase = createClient(url, key, { auth: { persistSession: false } })
   const since = new Date(Date.now() - RHYTHM_DAYS * 24 * 60 * 60 * 1000).toISOString()
