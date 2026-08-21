@@ -21,11 +21,24 @@ substitutions:
 
 esphome:
   name: ${device_name}
+  # For esp_sleep_get_wakeup_cause() in the boot handler.
+  includes:
+    - esp_sleep_shim.h
   friendly_name: Hans Display
   on_boot:
     priority: 600
     then:
       # Wi-Fi and SNTP need a moment before the first fetch can succeed.
+      # A pin wake means someone pressed Page Down; a timer wake must not move
+      # the page. esp_sleep_get_wakeup_cause is the only thing that tells them
+      # apart, since the pin is claimed by the sleep component.
+      - lambda: |-
+          auto cause = esp_sleep_get_wakeup_cause();
+          if (cause == ESP_SLEEP_WAKEUP_EXT0 || cause == ESP_SLEEP_WAKEUP_EXT1 ||
+              cause == ESP_SLEEP_WAKEUP_GPIO) {
+            id(page_index) += 1;
+            ESP_LOGI("hans", "woken by the button — advancing to page %d", id(page_index));
+          }
       - output.turn_on: battery_enable
       - delay: 200ms
       - component.update: battery_voltage
@@ -96,7 +109,9 @@ i2c:
 globals:
   - id: page_index
     type: int
-    restore_value: false
+    # Survives deep sleep — otherwise every wake would reset to the first page
+    # and the buttons would appear not to work at all.
+    restore_value: true
     initial_value: '0'
 
 script:
@@ -140,24 +155,12 @@ display:
 
 # ─── Refresh schedule ────────────────────────────────────────────────────────
 
+# Kept for the quiet-hours check on boot. The refresh cadence itself comes
+# from sleep_duration now — a sleeping device never reaches a cron trigger.
 time:
   - platform: sntp
     id: sntp_time
     timezone: Europe/Berlin
-    on_time:
-      - seconds: 0
-        minutes: /15
-        then:
-          - if:
-              condition:
-                # Nobody reads it at 03:00, and every refresh costs battery.
-                lambda: |-
-                  auto now = id(sntp_time).now();
-                  return !(now.hour >= 1 && now.hour < 6);
-              then:
-                - component.update: battery_voltage
-                - component.update: battery_level
-                - script.execute: refresh_dashboard
 
 # ─── Onboard sensors ─────────────────────────────────────────────────────────
 # The panel has an SHT4x, so it doubles as a sparrow and reports the room it
@@ -248,13 +251,16 @@ output:
     id: battery_enable
 
 binary_sensor:
-  # Left and right buttons page through the layouts; the middle one just
-  # re-fetches the page currently shown.
+  # Page Down lives on GPIO4, which is the deep-sleep wake pin and therefore
+  # cannot also be a binary_sensor — pressing it wakes the panel, and the boot
+  # handler reads the wake cause to advance the page. These two only respond
+  # while the panel is already awake.
   - platform: gpio
     pin:
       number: GPIO3
       mode: INPUT_PULLUP
       inverted: true
+    id: key_page_up
     name: Page Up
     on_press:
       - lambda: 'id(page_index) -= 1;'
@@ -262,31 +268,34 @@ binary_sensor:
 
   - platform: gpio
     pin:
-      number: GPIO4
-      mode: INPUT_PULLUP
-      inverted: true
-    name: Page Down
-    on_press:
-      - lambda: 'id(page_index) += 1;'
-      - script.execute: refresh_dashboard
-
-  - platform: gpio
-    pin:
       number: GPIO5
       mode: INPUT_PULLUP
       inverted: true
+    id: key_refresh
     name: Refresh Button
     on_press:
       - script.execute: refresh_dashboard
 
 # ─── Deep sleep ──────────────────────────────────────────────────────────────
-# Leave this off until the panel shows what you expect: while asleep the device
-# is unreachable, so OTA and the web server only work in the wake window.
-# Once you enable it, battery life goes from roughly a fortnight to months.
+# Measured before this was enabled: about 2 percentage points of battery per
+# hour, so a day and a half per charge. The panel is only actually needed for
+# the minute it takes to fetch and repaint.
 #
-# deep_sleep:
-#   id: deep_sleep_1
-#   run_duration: 60s
-#   sleep_duration: 30min
-#   wakeup_pin: GPIO4
-#   wakeup_pin_mode: INVERT_WAKEUP
+# run_duration is a ceiling, not a target. A cycle runs roughly: associate (a
+# few seconds), fetch (~3 s), repaint (~30 s, and the Spectra-6 refresh must
+# not be cut off midway). 90 s leaves room for a slow association without
+# risking a half-painted screen.
+#
+# GPIO4 (Page Down) is the wake pin, so pressing it both wakes the panel and
+# advances the page — see the wake-cause check in on_boot. Page Up and Refresh
+# only respond while the panel is already awake, which with two pages costs
+# nothing: one direction reaches either.
+deep_sleep:
+  id: deep_sleep_1
+  run_duration: 90s
+  sleep_duration: 15min
+  wakeup_pin:
+    number: GPIO4
+    mode: INPUT_PULLUP
+    inverted: true
+  wakeup_pin_mode: INVERT_WAKEUP
