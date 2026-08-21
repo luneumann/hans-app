@@ -44,3 +44,7 @@ firmware/**/.pio
 *.pfx
 *.keystore
 service-account*.json
+
+# Demo video — uploaded to GitHub as a release/issue attachment, not committed
+docs/screenshots/*.mp4
+docs/screenshots/*.mov

@@ -5,14 +5,32 @@ temperature, humidity, pressure and light into Supabase, a Nuxt app turns that i
 dashboard, and a battery-powered e-paper panel on the wall shows the current state
 without anyone having to open a phone.
 
-<!-- Screenshot: dashboard, desktop -->
-<!-- ![Dashboard](docs/screenshots/dashboard.png) -->
+![The Hans dashboard](docs/screenshots/dashboard.png)
 
-<!-- Screenshot: room detail with charts -->
-<!-- ![Room detail](docs/screenshots/room-detail.png) -->
+## A look around
 
-<!-- Photo: the e-paper panel on the wall -->
-<!-- ![E-paper panel](docs/screenshots/panel.jpg) -->
+The house reads as one number first, then breaks down per room. Trends run over the
+last 24 hours, and a plain-language dispatch says what actually changed.
+
+![Trends across all sensors](docs/screenshots/trends.png)
+
+A seven-day rhythm view shows when the flat is comfortable and when it is not, hour by
+hour, with each sensor reporting in below it.
+
+![Seven-day comfort rhythm and sensor cards](docs/screenshots/rhythm.png)
+
+Each room gets its own page with device health and per-metric history.
+
+![Room detail page](docs/screenshots/room-detail.png)
+
+The same dashboard on a phone, and the e-paper panel that shows it without one:
+
+| Mobile | E-paper panel |
+|---|---|
+| <img src="docs/screenshots/mobile.jpeg" alt="Mobile dashboard" width="260"> | <img src="docs/screenshots/panel.jpeg" alt="The e-paper panel" width="420"> |
+
+<!-- Demo video: upload the 30 s screen recording as a GitHub attachment and paste the
+     resulting https://github.com/user-attachments/assets/... URL on its own line here. -->
 
 ## Why I built it
 
