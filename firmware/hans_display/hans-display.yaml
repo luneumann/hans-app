@@ -103,7 +103,7 @@ script:
   - id: refresh_dashboard
     then:
       - lambda: |-
-          char url[256];
+          char url[320];
           snprintf(url, sizeof(url), "${dashboard_url}&battery=%d&page=%d",
                    (int) roundf(id(battery_level).state), id(page_index));
           id(dashboard_image).set_url(url);
