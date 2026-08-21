@@ -12,17 +12,35 @@ node_modules
 # Logs
 logs
 *.log
+npm-debug.log*
+yarn-error.log*
 
 # Misc
 .DS_Store
 .fleet
 .idea
+.vscode
+
+# Deploy
+.vercel
 
 # Local env files
 .env
 .env.*
 !.env.example
 
-# ESPHome build artefacts and secrets
+# Firmware secrets — copy the .example files and fill them in locally
 firmware/**/secrets.yaml
+firmware/**/secrets.h
+
+# Firmware build artefacts
 firmware/**/.esphome/
+firmware/**/.pio
+
+# Credentials and key material — never commit these
+*.pem
+*.key
+*.p12
+*.pfx
+*.keystore
+service-account*.json

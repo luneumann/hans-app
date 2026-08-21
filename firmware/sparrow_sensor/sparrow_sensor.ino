@@ -9,6 +9,9 @@
  * Sensors on the I2C bus:
  *   BME280  →  temperature, humidity, pressure
  *   BH1750  →  illuminance (lux)
+ *
+ * Before flashing: copy secrets.example.h to secrets.h and fill it in.
+ * secrets.h is git-ignored and holds the Wi-Fi, device and Supabase values.
  */
 
 #include <ESP8266WiFi.h>
@@ -20,17 +23,10 @@
 #include <Adafruit_Sensor.h>
 #include <BH1750.h>
 
+#include "secrets.h"   // WIFI_SSID, WIFI_PASSWORD, SPARROW_ID,
+                       // SUPABASE_URL, SUPABASE_ANON_KEY — not committed
+
 // ─── Configuration ────────────────────────────────────────────────────────────
-
-#define WIFI_SSID        "YOUR_WIFI_SSID"
-#define WIFI_PASSWORD    "YOUR_WIFI_PASSWORD"
-
-// Supabase project URL and anon key
-#define SUPABASE_URL     "https://navmfjgeoykmynriwpbz.supabase.co"
-#define SUPABASE_ANON_KEY "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5hdm1mamdlb3lrbXlucml3cGJ6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk2NjAyNDgsImV4cCI6MjA5NTIzNjI0OH0.ntJHHqSNJjFVHSCPEUyhwx6xVIURBgwjuE2tsxRZ7vg"
-
-// Unique ID for this sensor device (must exist in devices table)
-#define SPARROW_ID       "YOUR_SPARROW_DEVICE_ID"
 
 // Deep sleep duration in microseconds (5 minutes)
 #define SLEEP_INTERVAL_US (5UL * 60UL * 1000000UL)
