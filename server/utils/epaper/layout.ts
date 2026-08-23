@@ -18,29 +18,13 @@ const PAD = 32
 const RULE = '#000000'
 const FONT = 'Geist, Helvetica Neue, Helvetica, Arial, sans-serif'
 
-/**
- * Solid Spectra-6 green is a dark moss on the panel and swallows black text.
- * There is no lighter green in the palette, so it is halftoned against white
- * with a 2 px checkerboard — a regular pattern rather than error diffusion,
- * which keeps the grid aligned to the pixel raster and the glyph edges clean.
- * Yellow and red are light and dark enough to stand on their own.
- */
-const GREEN_LIGHT = 'url(#green-light)'
-
-const PATTERN_DEFS = `<defs>
-  <pattern id="green-light" width="2" height="2" patternUnits="userSpaceOnUse">
-    <rect width="2" height="2" fill="#FFFFFF"/>
-    <rect x="0" y="0" width="1" height="1" fill="#00FF00"/>
-    <rect x="1" y="1" width="1" height="1" fill="#00FF00"/>
-  </pattern>
-</defs>`
-
 const TONE_FILL: Record<ComfortTone, string> = {
-  good: GREEN_LIGHT, warn: '#FFFF00', bad: '#FF0000', neutral: '#FFFFFF',
+  good: '#00FF00', warn: '#FFFF00', bad: '#FF0000', neutral: '#FFFFFF',
 }
-// Red is the only primary dark enough to need knocked-out text.
+// Spectra-6 green and red both render dark enough that black type disappears
+// into them; yellow is light enough to carry it.
 const TONE_INK: Record<ComfortTone, string> = {
-  good: '#000000', warn: '#000000', bad: '#FFFFFF', neutral: '#000000',
+  good: '#FFFFFF', warn: '#000000', bad: '#FFFFFF', neutral: '#000000',
 }
 
 interface Ctx {
@@ -176,22 +160,27 @@ function panelForecast(f: Forecast | null, ctx: Ctx): void {
   }
 
   push(label(`${forecastTitle(f.date)} · speyer`, PAD, 104))
-  push(`<text x="${PAD}" y="192" font-size="76" font-weight="300"
-    fill="#000000">${esc(`${num(f.low, 0)}° – ${num(f.high, 0)}°`)}</text>`)
+  // The high is what a forecast is read for; the low trails it at half the
+  // size, the way every weather app sets it.
+  push(`<text x="${PAD}" y="192" font-size="86" font-weight="300"
+    fill="#000000">${esc(`${num(f.high, 0)}°`)}</text>`)
+  push(`<text x="${PAD + 140}" y="192" font-size="44" font-weight="300"
+    fill="#000000">${esc(`${num(f.low, 0)}°`)}</text>`)
 
-  push(label('rain by hour', PAD, 238))
-
+  const peak = Math.max(...f.hourly.map(h => h.mm), 0)
   const bx = PAD, bw = SPLIT_X - 30 - PAD
   const base = 352, maxH = 92
   const colW = bw / 24
-  push(`<rect x="${bx}" y="${base}" width="${bw}" height="2" fill="${RULE}"/>`)
 
-  const peak = Math.max(...f.hourly.map(h => h.mm), 0)
   if (peak <= 0) {
-    // An empty chart reads as broken; say the dry day out loud instead.
-    push(`<text x="${bx}" y="${base - 34}" font-size="30"
-      fill="#000000">no rain expected</text>`)
+    // No bars, no axis, no baseline. An hour axis with nothing on it is what
+    // made the message look stranded — the absence of rain is a statement, not
+    // a chart that failed to draw.
+    push(label('rain', PAD, 238))
+    push(`<text x="${bx}" y="272" font-size="34" fill="#000000">no rain expected</text>`)
   } else {
+    push(label('rain by hour', PAD, 238))
+    push(`<rect x="${bx}" y="${base}" width="${bw}" height="2" fill="${RULE}"/>`)
     // Scale to at least 1 mm so a drizzle does not draw like a downpour.
     const scale = Math.max(peak, 1)
     for (const h of f.hourly) {
@@ -202,26 +191,27 @@ function panelForecast(f: Forecast | null, ctx: Ctx): void {
     }
     push(`<text x="${bx + bw}" y="${base - maxH + 4}" font-size="15" text-anchor="end"
       fill="#000000">${esc(`${peak.toFixed(1)} mm peak`)}</text>`)
+    for (const h of [0, 6, 12, 18]) {
+      push(label(String(h).padStart(2, '0'), bx + h * colW, base + 24))
+    }
+    push(label('24', bx + bw, base + 24, '#000000', 'end'))
   }
-
-  for (const h of [0, 6, 12, 18]) {
-    push(label(String(h).padStart(2, '0'), bx + h * colW, base + 24))
-  }
-  push(label('24', bx + bw, base + 24, '#000000', 'end'))
 
   const wettest = f.hourly.reduce((a, b) => (b.mm > a.mm ? b : a), f.hourly[0])
   const summary = f.rainTotal > 0
     ? `${f.rainTotal.toFixed(1)} mm total · heaviest around ${String(wettest.hour).padStart(2, '0')}:00`
     : `${Math.max(...f.hourly.map(h => h.chance), 0)} % peak chance of a shower`
-  push(`<text x="${bx}" y="${base + 60}" font-size="19" fill="#000000">${esc(summary)}</text>`)
+  push(`<text x="${bx}" y="${peak > 0 ? base + 62 : 302}" font-size="19"
+    fill="#000000">${esc(summary)}</text>`)
 }
 
 /**
  * The indoor day, at a size worth reading across the room.
  *
- * Drawn as a filled area rather than a bare line: on a six-colour panel with
- * no line weights to play with, the fill is what makes the shape legible from
- * a distance, and the outline keeps the exact value readable up close.
+ * A stroked line rather than a filled area. Filling made sense while the scale
+ * was tight enough for the curve to work the whole height; against a six-degree
+ * floor the shape only occupies a third of it, and the fill below turns into a
+ * solid block with a faint ripple on top — a lot of ink saying very little.
  */
 function panelDayCourse(d: EpaperData, ctx: Ctx): void {
   const { push, accent } = ctx
@@ -238,9 +228,11 @@ function panelDayCourse(d: EpaperData, ctx: Ctx): void {
 
   const lo = Math.min(...d.series)
   const hi = Math.max(...d.series)
-  // Pad the range so a flat day is a flat line across the middle rather than
-  // noise magnified to full height.
-  const span = Math.max(hi - lo, 1.5)
+  // A room moves through maybe two degrees in a day. Scaling to whatever range
+  // the data happens to have would stretch that across the full height and
+  // draw a mountain out of it; a six-degree floor keeps the shape honest about
+  // how small the change actually is.
+  const span = Math.max(hi - lo, 6)
   const mid = (hi + lo) / 2
   const yTop = mid + span / 2, yBot = mid - span / 2
   const yOf = (v: number) => base - ((v - yBot) / (yTop - yBot)) * h
@@ -248,8 +240,8 @@ function panelDayCourse(d: EpaperData, ctx: Ctx): void {
   const pts = d.series.map((v, i) =>
     `${(x + (i / (d.series.length - 1)) * w).toFixed(1)},${yOf(v).toFixed(1)}`)
 
-  push(`<polygon points="${x},${base} ${pts.join(' ')} ${x + w},${base}" fill="${accent}"/>`)
-  push(`<polyline points="${pts.join(' ')}" fill="none" stroke="#000000" stroke-width="2"/>`)
+  push(`<polyline points="${pts.join(' ')}" fill="none" stroke="${accent}" stroke-width="4"
+    stroke-linejoin="round" stroke-linecap="round"/>`)
   push(`<rect x="${x}" y="${base}" width="${w}" height="2" fill="${RULE}"/>`)
 
   // Value axis: only the two numbers that matter, sitting on their own lines.
@@ -338,7 +330,6 @@ export function buildRhythmSvg(
   }
   const { push } = ctx
 
-  push(PATTERN_DEFS)
   push(`<rect width="${SCREEN_W}" height="${SCREEN_H}" fill="#FFFFFF"/>`)
   header({ stale: r.stale, updatedAt: r.updatedAt } as EpaperData, batteryPct, ctx)
 
@@ -400,7 +391,6 @@ export function buildDashboardSvg(
     push: (s: string) => parts.push(s),
   }
 
-  ctx.push(PATTERN_DEFS)
   ctx.push(`<rect width="${SCREEN_W}" height="${SCREEN_H}" fill="#FFFFFF"/>`)
   header(d, batteryPct, ctx)
   layoutDashboard(d, ctx, forecast, hour)
