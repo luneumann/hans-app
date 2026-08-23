@@ -18,6 +18,10 @@ substitutions:
   # the devices table before Supabase will accept the inserts.
   sparrow_id: hallway
   dashboard_url: !secret hans_dashboard_url
+  # Flip to "true" to let the panel sleep again. While false it stays awake and
+  # reachable, which is what iterating on the layout needs — a sleeping panel
+  # is only online for 90 seconds out of every 15 minutes.
+  sleep_between_refreshes: "false"
 
 esphome:
   name: ${device_name}
@@ -155,12 +159,28 @@ display:
 
 # ─── Refresh schedule ────────────────────────────────────────────────────────
 
-# Kept for the quiet-hours check on boot. The refresh cadence itself comes
-# from sleep_duration now — a sleeping device never reaches a cron trigger.
+# Quiet-hours check on boot, and the refresh cadence while sleeping is off.
+# When the panel does sleep it never reaches this trigger and sleep_duration
+# sets the pace instead; the two never both apply.
 time:
   - platform: sntp
     id: sntp_time
     timezone: Europe/Berlin
+    on_time:
+      - seconds: 0
+        minutes: /15
+        then:
+          - if:
+              condition:
+                and:
+                  - lambda: 'return !${sleep_between_refreshes};'
+                  - lambda: |-
+                      auto now = id(sntp_time).now();
+                      return !(now.hour >= 1 && now.hour < 6);
+              then:
+                - component.update: battery_voltage
+                - component.update: battery_level
+                - script.execute: refresh_dashboard
 
 # ─── Onboard sensors ─────────────────────────────────────────────────────────
 # The panel has an SHT4x, so it doubles as a sparrow and reports the room it

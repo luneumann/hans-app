@@ -1,10 +1,12 @@
 import type { H3Event } from 'h3'
 import { fetchEpaperData, fetchRhythmData } from './data'
 import { buildDashboardSvg, buildRhythmSvg } from './layout'
+import { fetchForecast, type Forecast } from './weather'
 import { isPaletteName, type PaletteName } from './palette'
 
 export { svgToPng, SCREEN_W, SCREEN_H } from './render'
 export { buildDashboardSvg, buildRhythmSvg } from './layout'
+export { fetchForecast } from './weather'
 export { fetchEpaperData, deriveEpaperData, fetchRhythmData, deriveRhythmData } from './data'
 
 /**
@@ -55,6 +57,31 @@ export async function epaperPayload(event: H3Event): Promise<{ svg: string; pale
     return { svg: buildRhythmSvg(rhythm, palette, battery), palette }
   }
 
-  const data = await fetchEpaperData()
-  return { svg: buildDashboardSvg(data, palette, battery), palette }
+  // Berlin's hour, not the server's — the panel hangs in a flat, not in iad1.
+  const hour = Number(new Intl.DateTimeFormat('en-GB', {
+    timeZone: 'Europe/Berlin', hour: '2-digit', hour12: false,
+  }).format(new Date()))
+
+  // Evening and night look at tomorrow; the daytime airing panel needs today's
+  // curve. `?forecastDay` overrides it so either can be previewed at any hour.
+  const evening = hour >= 18
+  const dayOffset = query.forecastDay !== undefined
+    ? Math.max(0, Math.min(1, Number(query.forecastDay) || 0))
+    : (evening ? 1 : 0)
+
+  const [data, forecast] = await Promise.all([
+    fetchEpaperData(),
+    // A forecast outage must not take the panel down with it — the indoor half
+    // is the part that cannot be got anywhere else.
+    fetchForecast(dayOffset).catch((err): Forecast | null => {
+      console.warn('[epaper] forecast unavailable:', err instanceof Error ? err.message : err)
+      return null
+    }),
+  ])
+
+  const forcedHour = query.hour !== undefined ? Number(query.hour) : hour
+  return {
+    svg: buildDashboardSvg(data, palette, battery, forecast, forcedHour),
+    palette,
+  }
 }
