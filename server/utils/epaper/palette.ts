@@ -63,11 +63,20 @@ function nearest(palette: Rgb[], r: number, g: number, b: number): Rgb {
 export function dither(rgba: Buffer, width: number, height: number, palette: Rgb[]): void {
   // Error diffusion needs headroom outside 0–255, so work in floats.
   const buf = new Float32Array(width * height * 3)
+  // Whether the *source* pixel had any colour in it, decided before diffusion
+  // starts. Text is antialiased grey, and letting diffused error steer a grey
+  // pixel towards red or yellow speckles the type with stray coloured dots —
+  // invisible in a thumbnail, dirt on a 7.3" panel.
+  const grey = new Uint8Array(width * height)
+  const greyPalette = palette.filter(c => c[0] === c[1] && c[1] === c[2])
+
   for (let i = 0; i < width * height; i++) {
     const a = rgba[i * 4 + 3] / 255
-    buf[i * 3]     = rgba[i * 4]     * a + 255 * (1 - a)
-    buf[i * 3 + 1] = rgba[i * 4 + 1] * a + 255 * (1 - a)
-    buf[i * 3 + 2] = rgba[i * 4 + 2] * a + 255 * (1 - a)
+    const r = rgba[i * 4]     * a + 255 * (1 - a)
+    const g = rgba[i * 4 + 1] * a + 255 * (1 - a)
+    const b = rgba[i * 4 + 2] * a + 255 * (1 - a)
+    buf[i * 3] = r; buf[i * 3 + 1] = g; buf[i * 3 + 2] = b
+    grey[i] = Math.abs(r - g) < 8 && Math.abs(g - b) < 8 && Math.abs(r - b) < 8 ? 1 : 0
   }
 
   const spread = (i: number, er: number, eg: number, eb: number, f: number) => {
@@ -80,7 +89,8 @@ export function dither(rgba: Buffer, width: number, height: number, palette: Rgb
     for (let x = 0; x < width; x++) {
       const i = y * width + x
       const r = buf[i * 3], g = buf[i * 3 + 1], b = buf[i * 3 + 2]
-      const [nr, ng, nb] = nearest(palette, r, g, b)
+      const choices = grey[i] && greyPalette.length ? greyPalette : palette
+      const [nr, ng, nb] = nearest(choices, r, g, b)
 
       rgba[i * 4]     = nr
       rgba[i * 4 + 1] = ng

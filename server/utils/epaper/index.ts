@@ -1,6 +1,6 @@
 import type { H3Event } from 'h3'
 import { fetchEpaperData, fetchRhythmData } from './data'
-import { buildDashboardSvg, buildRhythmSvg } from './layout'
+import { buildDashboardSvg, buildRhythmSvg, FORECAST_FROM_HOUR } from './layout'
 import { fetchForecast, type Forecast } from './weather'
 import { isPaletteName, type PaletteName } from './palette'
 
@@ -64,7 +64,7 @@ export async function epaperPayload(event: H3Event): Promise<{ svg: string; pale
 
   // Evening and night look at tomorrow; the daytime airing panel needs today's
   // curve. `?forecastDay` overrides it so either can be previewed at any hour.
-  const evening = hour >= 18
+  const evening = hour >= FORECAST_FROM_HOUR
   const dayOffset = query.forecastDay !== undefined
     ? Math.max(0, Math.min(1, Number(query.forecastDay) || 0))
     : (evening ? 1 : 0)

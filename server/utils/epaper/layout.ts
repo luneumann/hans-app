@@ -108,21 +108,6 @@ function battery(pct: number, x: number, y: number, mono: boolean): string {
   ].join('')
 }
 
-/** Polyline through the series, fitted to the given box. */
-function sparkline(series: number[], x: number, y: number, w: number, h: number, stroke: string): string {
-  if (series.length < 2) return ''
-  const lo = Math.min(...series)
-  const hi = Math.max(...series)
-  const span = hi - lo || 1
-  const pts = series.map((v, i) => {
-    const px = x + (i / (series.length - 1)) * w
-    const py = y + h - ((v - lo) / span) * h
-    return `${px.toFixed(1)},${py.toFixed(1)}`
-  }).join(' ')
-  return `<polyline points="${pts}" fill="none" stroke="${stroke}" stroke-width="3"
-    stroke-linejoin="round" stroke-linecap="round"/>`
-}
-
 function header(d: EpaperData, batteryPct: number | null, ctx: Ctx): void {
   ctx.push(`<text x="${PAD}" y="46" font-size="30" font-weight="600"
     letter-spacing="6" fill="#000000">HANS</text>`)
@@ -146,6 +131,10 @@ function header(d: EpaperData, batteryPct: number | null, ctx: Ctx): void {
 /** Vertical rule between the two halves. */
 const SPLIT_X = 462
 
+/** The forecast holds the left panel from this hour until that one, next day. */
+export const FORECAST_FROM_HOUR = 21
+export const FORECAST_UNTIL_HOUR = 10
+
 function panelIndoor(d: EpaperData, ctx: Ctx): void {
   const { push, mono } = ctx
   const x = SPLIT_X + 26
@@ -167,9 +156,6 @@ function panelIndoor(d: EpaperData, ctx: Ctx): void {
   push(label('comfort', x + 96, by + 34, toneInk(d.house.tone, mono)))
   push(`<text x="${x + 96}" y="${by + 64}" font-size="22"
     fill="${toneInk(d.house.tone, mono)}">${esc(d.house.label)}</text>`)
-
-  push(label('indoor · 24 h', x, 404))
-  push(sparkline(d.series, x, 416, SCREEN_W - PAD - x, 44, ctx.accent))
 }
 
 /** Weekday and date, so the panel never has to claim "today" or "tomorrow". */
@@ -230,74 +216,86 @@ function panelForecast(f: Forecast | null, ctx: Ctx): void {
   push(`<text x="${bx}" y="${base + 60}" font-size="19" fill="#000000">${esc(summary)}</text>`)
 }
 
-function panelAiring(d: EpaperData, f: Forecast | null, hour: number, ctx: Ctx): void {
+/**
+ * The indoor day, at a size worth reading across the room.
+ *
+ * Drawn as a filled area rather than a bare line: on a six-colour panel with
+ * no line weights to play with, the fill is what makes the shape legible from
+ * a distance, and the outline keeps the exact value readable up close.
+ */
+function panelDayCourse(d: EpaperData, ctx: Ctx): void {
   const { push, accent } = ctx
 
-  const inT = d.house.temp, inD = d.house.dew
-  const outT = d.outdoor?.temp ?? null
-  const outD = dewPoint(d.outdoor?.temp ?? null, d.outdoor?.humidity ?? null)
+  push(label('indoor · last 24 h', PAD, 104))
 
-  push(label('airing out', PAD, 104))
+  const x = PAD, w = SPLIT_X - 30 - PAD
+  const top = 150, base = 392, h = base - top
 
-  // Worth opening when outside is both cooler and no muggier. Dew point is the
-  // half people get wrong: cooler air that is damper makes a room feel worse,
-  // and it is what actually loads moisture into the walls.
-  let verdict = 'no outdoor data'
-  let reason = 'the balcony sensor is not reporting'
-  if (inT !== null && outT !== null && inD !== null && outD !== null) {
-    const cooler = outT < inT - 0.5
-    const drier = outD <= inD
-    if (cooler && drier) { verdict = 'open up'; reason = 'outside is cooler and no damper' }
-    else if (cooler && !drier) { verdict = 'your call'; reason = 'cooler out, but damper air' }
-    else if (!cooler && drier) { verdict = 'keep shut'; reason = 'no cooler outside yet' }
-    else { verdict = 'keep shut'; reason = 'warmer and damper outside' }
+  if (d.series.length < 2) {
+    push(`<text x="${x}" y="${top + 60}" font-size="30" fill="#000000">not enough history yet</text>`)
+    return
   }
 
-  push(`<text x="${PAD}" y="176" font-size="58" font-weight="300"
-    fill="#000000">${esc(verdict)}</text>`)
-  push(`<text x="${PAD}" y="210" font-size="20" fill="#000000">${esc(reason)}</text>`)
+  const lo = Math.min(...d.series)
+  const hi = Math.max(...d.series)
+  // Pad the range so a flat day is a flat line across the middle rather than
+  // noise magnified to full height.
+  const span = Math.max(hi - lo, 1.5)
+  const mid = (hi + lo) / 2
+  const yTop = mid + span / 2, yBot = mid - span / 2
+  const yOf = (v: number) => base - ((v - yBot) / (yTop - yBot)) * h
 
-  const row = (title: string, t: number | null, dew: number | null, y: number) => {
-    push(label(title, PAD, y))
-    push(`<text x="${PAD}" y="${y + 38}" font-size="34" font-weight="300"
-      fill="#000000">${esc(num(t))}°</text>`)
-    push(`<text x="${SPLIT_X - 30}" y="${y + 38}" font-size="20" text-anchor="end"
-      fill="#000000">${esc(`dew ${num(dew)}°`)}</text>`)
+  const pts = d.series.map((v, i) =>
+    `${(x + (i / (d.series.length - 1)) * w).toFixed(1)},${yOf(v).toFixed(1)}`)
+
+  push(`<polygon points="${x},${base} ${pts.join(' ')} ${x + w},${base}" fill="${accent}"/>`)
+  push(`<polyline points="${pts.join(' ')}" fill="none" stroke="#000000" stroke-width="2"/>`)
+  push(`<rect x="${x}" y="${base}" width="${w}" height="2" fill="${RULE}"/>`)
+
+  // Value axis: only the two numbers that matter, sitting on their own lines.
+  // Dashed rather than a faint grey — opacity has nowhere to go in a six-colour
+  // palette and would dither into noise. The labels get a white plate because
+  // the filled area runs underneath them at unpredictable heights.
+  for (const v of [hi, lo]) {
+    const vy = yOf(v)
+    push(`<line x1="${x}" y1="${vy.toFixed(1)}" x2="${x + w}" y2="${vy.toFixed(1)}"
+      stroke="#000000" stroke-width="1" stroke-dasharray="4 5"/>`)
+    const label = `${v.toFixed(1)}°`
+    const lw = label.length * 9 + 10
+    push(`<rect x="${(x + w - lw).toFixed(1)}" y="${(vy - 22).toFixed(1)}"
+      width="${lw}" height="20" fill="#FFFFFF"/>`)
+    push(`<text x="${x + w - 5}" y="${(vy - 7).toFixed(1)}" font-size="16" text-anchor="end"
+      fill="#000000">${esc(label)}</text>`)
   }
-  row('inside', inT, inD, 258)
-  row('outside', outT, outD, 328)
 
-  // The practical follow-up question, which differs depending on which side of
-  // the crossover the day is currently on: when does the window open, or how
-  // long does it stay open. The hour comes from the caller because the server
-  // runs in UTC and the flat does not.
-  let outlook = ''
-  if (f && inT !== null && outT !== null) {
-    const later = f.hourly.filter(h => h.hour > hour && h.temp !== null)
-    if (outT < inT) {
-      const closes = later.find(h => (h.temp as number) >= inT)
-      outlook = closes
-        ? `stays cooler until ${String(closes.hour).padStart(2, '0')}:00`
-        : 'stays cooler than inside all day'
-    } else {
-      const opens = later.find(h => (h.temp as number) < inT)
-      outlook = opens
-        ? `cooler than inside from ${String(opens.hour).padStart(2, '0')}:00`
-        : 'stays warmer than inside all day'
+  // Time axis from the real window rather than assuming a full 24 hours — a
+  // sensor gap would otherwise mislabel the whole chart.
+  if (d.seriesStart && d.seriesEnd) {
+    const fmt = (t: Date) => t.toLocaleTimeString('en-GB', {
+      hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'Europe/Berlin',
+    })
+    const span_ms = d.seriesEnd.getTime() - d.seriesStart.getTime()
+    for (const frac of [0, 0.5, 1]) {
+      const t = new Date(d.seriesStart.getTime() + span_ms * frac)
+      const anchor = frac === 0 ? 'start' : frac === 1 ? 'end' : 'middle'
+      push(label(fmt(t), x + frac * w, base + 26, '#000000', anchor))
     }
   }
-  if (outlook) {
-    push(`<rect x="${PAD}" y="398" width="${SPLIT_X - 30 - PAD}" height="2" fill="${RULE}"/>`)
-    push(`<text x="${PAD}" y="432" font-size="20" fill="${accent}">${esc(outlook)}</text>`)
-  }
+
+  const now = d.series[d.series.length - 1]
+  push(`<text x="${x}" y="${base + 62}" font-size="20" fill="#000000">${esc(
+    `now ${now.toFixed(1)}° · ${(now - d.series[0] >= 0 ? '+' : '')}${(now - d.series[0]).toFixed(1)}° over the window`,
+  )}</text>`)
 }
+
 
 function layoutDashboard(d: EpaperData, ctx: Ctx, forecast: Forecast | null, hour: number): void {
   ctx.push(`<rect x="${SPLIT_X}" y="64" width="3" height="${SCREEN_H - 64}" fill="${RULE}"/>`)
   panelIndoor(d, ctx)
-  // 18:00 through 10:00: the window where tomorrow is the useful question.
-  if (hour >= 18 || hour < 10) panelForecast(forecast, ctx)
-  else panelAiring(d, forecast, hour, ctx)
+  // 21:00 through 10:00: the window where the coming day is the useful
+  // question. Outside it, the day the flat has actually had.
+  if (hour >= FORECAST_FROM_HOUR || hour < FORECAST_UNTIL_HOUR) panelForecast(forecast, ctx)
+  else panelDayCourse(d, ctx)
 }
 
 

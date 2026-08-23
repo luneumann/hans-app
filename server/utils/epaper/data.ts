@@ -31,8 +31,11 @@ export interface EpaperData {
     label: string
     tone: ComfortTone
   }
-  /** Indoor average temperature over the window, for the sparkline. */
+  /** Indoor average temperature over the window, oldest first. */
   series: number[]
+  /** Wall-clock span the series covers, so a chart can label real hours. */
+  seriesStart: Date | null
+  seriesEnd: Date | null
   updatedAt: Date | null
   /** No reading in the last hour — the panel should say so rather than lie. */
   stale: boolean
@@ -166,7 +169,8 @@ export function deriveEpaperData(rows: Reading[]): EpaperData {
   // Indoor average temperature bucketed into ~5-minute slots, so the sparkline
   // reflects elapsed time rather than however many rows each sensor happened
   // to produce.
-  const series = buildSeries(rows.filter(r => !isOutdoorSparrow(r.sparrow_id) && r.metric === 'temperature'))
+  const tempRows = rows.filter(r => !isOutdoorSparrow(r.sparrow_id) && r.metric === 'temperature')
+  const series = buildSeries(tempRows)
 
   const lastIso = rows.length ? rows[rows.length - 1].recorded_at : null
   const updatedAt = lastIso ? new Date(lastIso) : null
@@ -190,6 +194,8 @@ export function deriveEpaperData(rows: Reading[]): EpaperData {
       tone: verdict.tone,
     },
     series,
+    seriesStart: tempRows.length ? new Date(tempRows[0].recorded_at) : null,
+    seriesEnd: tempRows.length ? new Date(tempRows[tempRows.length - 1].recorded_at) : null,
     updatedAt,
     stale: !updatedAt || Date.now() - updatedAt.getTime() > 60 * 60 * 1000,
   }
