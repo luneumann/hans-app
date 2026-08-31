@@ -243,6 +243,8 @@ export type RhythmTone = 'good' | 'warn' | 'cold' | 'hot' | 'none'
 export interface RhythmData {
   /** Seven days, oldest first, 24 hourly cells each. */
   days: { label: string; cells: RhythmTone[] }[]
+  /** Latest outdoor reading, so this page can carry it too. */
+  outdoor: { name: string; temp: number | null; humidity: number | null } | null
   updatedAt: Date | null
   stale: boolean
 }
@@ -282,6 +284,18 @@ function berlinOffsetMinutes(): number {
 }
 
 export function deriveRhythmData(rows: Reading[]): RhythmData {
+  // Pulled out before the filter — the tiles are indoor-only, but the page
+  // still shows the current outdoor reading, and it is already in these rows.
+  const outdoorId = [...new Set(rows.map(r => r.sparrow_id))].find(isOutdoorSparrow) ?? null
+  const lastOutdoor = (metric: string): number | null => {
+    let v: number | null = null
+    for (const r of rows) if (r.sparrow_id === outdoorId && r.metric === metric) v = r.value
+    return v
+  }
+  const outdoor = outdoorId
+    ? { name: prettyName(outdoorId), temp: lastOutdoor('temperature'), humidity: lastOutdoor('humidity') }
+    : null
+
   // Outdoor readings would drag the comfort picture around, and the panel's
   // own sensor is excluded for the same reason it is hidden elsewhere.
   rows = rows.filter(r => !HIDDEN_SPARROWS.has(r.sparrow_id) && !isOutdoorSparrow(r.sparrow_id))
@@ -329,6 +343,7 @@ export function deriveRhythmData(rows: Reading[]): RhythmData {
   const updatedAt = lastIso ? new Date(lastIso) : null
   return {
     days,
+    outdoor,
     updatedAt,
     stale: !updatedAt || Date.now() - updatedAt.getTime() > 60 * 60 * 1000,
   }

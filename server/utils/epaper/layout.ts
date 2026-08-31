@@ -140,6 +140,23 @@ function panelIndoor(d: EpaperData, ctx: Ctx): void {
   push(label('comfort', x + 96, by + 34, toneInk(d.house.tone, mono)))
   push(`<text x="${x + 96}" y="${by + 64}" font-size="22"
     fill="${toneInk(d.house.tone, mono)}">${esc(d.house.label)}</text>`)
+
+  // Outdoor sits below the rule on every page and at every hour — the one
+  // reading you want without having to think about what the panel is showing.
+  // It comes from the balcony sparrow rather than the forecast: a measurement
+  // at the window beats a grid point five kilometres away.
+  const oy = 404
+  push(`<rect x="${x}" y="${oy - 26}" width="${SCREEN_W - PAD - x}" height="2" fill="${RULE}"/>`)
+  push(label(d.outdoor ? `outdoor · ${d.outdoor.name}` : 'outdoor', x, oy, ctx.accent))
+  if (d.outdoor) {
+    push(`<text x="${x}" y="${oy + 50}" font-size="52" font-weight="300"
+      fill="#000000">${esc(num(d.outdoor.temp))}°</text>`)
+    push(`<text x="${SCREEN_W - PAD}" y="${oy + 50}" font-size="24" text-anchor="end"
+      fill="#000000">${esc(num(d.outdoor.humidity, 0))} %</text>`)
+  } else {
+    push(`<text x="${x}" y="${oy + 44}" font-size="24"
+      fill="#000000">sensor not reporting</text>`)
+  }
 }
 
 /** Weekday and date, so the panel never has to claim "today" or "tomorrow". */
@@ -360,7 +377,7 @@ export function buildRhythmSvg(
   for (const h of [0, 6, 12, 18]) {
     push(label(String(h).padStart(2, '0'), gridX + h * cellW, axisY))
   }
-  push(label('24 h', SCREEN_W - PAD, axisY, '#000000', 'end'))
+  push(label('24', SCREEN_W - PAD, axisY, '#000000', 'end'))
 
   const legendY = axisY + 34
   let lx = PAD
@@ -371,7 +388,15 @@ export function buildRhythmSvg(
     push(`<text x="${lx + 24}" y="${legendY}" font-size="15" fill="#000000">${esc(item.text)}</text>`)
     lx += 24 + item.text.length * 8 + 26
   }
-  push(label('indoor comfort · 7 days', SCREEN_W - PAD, legendY, '#000000', 'end'))
+  // Same corner as the dashboard, but on the legend's own line: stacking it
+  // would run into the hour axis directly above and into the bottom edge below.
+  if (r.outdoor) {
+    push(`<text x="${SCREEN_W - PAD}" y="${legendY + 2}" font-size="26" font-weight="300"
+      text-anchor="end" fill="#000000">${esc(num(r.outdoor.temp))}°</text>`)
+    push(label(`outdoor · ${r.outdoor.name}`, SCREEN_W - PAD - 76, legendY, ctx.accent, 'end'))
+  } else {
+    push(label('indoor comfort · 7 days', SCREEN_W - PAD, legendY, '#000000', 'end'))
+  }
 
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${SCREEN_W}" height="${SCREEN_H}"
     viewBox="0 0 ${SCREEN_W} ${SCREEN_H}" font-family="${FONT}">${parts.join('')}</svg>`
