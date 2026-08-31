@@ -1,27 +1,13 @@
 import type { H3Event } from 'h3'
-import { fetchEpaperData, fetchRhythmData } from './data'
-import { buildDashboardSvg, buildRhythmSvg, FORECAST_FROM_HOUR } from './layout'
+import { fetchEpaperData } from './data'
+import { buildDashboardSvg, FORECAST_FROM_HOUR } from './layout'
 import { fetchForecast, type Forecast } from './weather'
 import { isPaletteName, type PaletteName } from './palette'
 
 export { svgToPng, SCREEN_W, SCREEN_H } from './render'
-export { buildDashboardSvg, buildRhythmSvg } from './layout'
+export { buildDashboardSvg } from './layout'
 export { fetchForecast } from './weather'
-export { fetchEpaperData, deriveEpaperData, fetchRhythmData, deriveRhythmData } from './data'
-
-/**
- * Pages the buttons cycle through, in order.
- *
- * The device sends a raw counter and never learns how many pages exist, so
- * adding one here changes what the buttons do without reflashing.
- */
-export const PAGES = ['dashboard', 'rhythm'] as const
-export type PageName = (typeof PAGES)[number]
-
-/** Proper modulo — the device's counter goes negative when paging backwards. */
-function wrap(n: number, len: number): number {
-  return ((n % len) + len) % len
-}
+export { fetchEpaperData, deriveEpaperData } from './data'
 
 export async function epaperPayload(event: H3Event): Promise<{ svg: string; palette: PaletteName }> {
   const query = getQuery(event)
@@ -43,27 +29,18 @@ export async function epaperPayload(event: H3Event): Promise<{ svg: string; pale
     ? Math.round(Math.min(100, Math.max(0, rawBattery)))
     : null
 
-  // The panel sends a counter; a browser can pass the name instead.
-  const rawPage = String(query.page ?? '')
-  const asNumber = Number(rawPage)
-  const page: PageName = Number.isFinite(asNumber) && rawPage !== ''
-    ? PAGES[wrap(Math.trunc(asNumber), PAGES.length)]
-    : (PAGES as readonly string[]).includes(rawPage)
-      ? (rawPage as PageName)
-      : 'dashboard'
-
-  if (page === 'rhythm') {
-    const rhythm = await fetchRhythmData()
-    return { svg: buildRhythmSvg(rhythm, palette, battery), palette }
-  }
+  // The panel still appends `&page=N` from its button counter. There is one
+  // page now, so it is read and ignored rather than removed from the firmware —
+  // dropping a page needs no reflash, which was the point of sending a counter
+  // instead of a page name.
 
   // Berlin's hour, not the server's — the panel hangs in a flat, not in iad1.
   const hour = Number(new Intl.DateTimeFormat('en-GB', {
     timeZone: 'Europe/Berlin', hour: '2-digit', hour12: false,
   }).format(new Date()))
 
-  // Evening and night look at tomorrow; the daytime airing panel needs today's
-  // curve. `?forecastDay` overrides it so either can be previewed at any hour.
+  // Evening and night look at tomorrow. `?forecastDay` overrides it so either
+  // day can be previewed at any hour.
   const evening = hour >= FORECAST_FROM_HOUR
   const dayOffset = query.forecastDay !== undefined
     ? Math.max(0, Math.min(1, Number(query.forecastDay) || 0))

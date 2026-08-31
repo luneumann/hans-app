@@ -1,11 +1,11 @@
-import type { EpaperData, RhythmData, RhythmTone } from './data'
+import type { EpaperData } from './data'
 import type { Forecast } from './weather'
 import { dewPoint, type ComfortTone } from '../../../app/composables/useComfort'
 import type { PaletteName } from './palette'
 import { SCREEN_W, SCREEN_H } from './render'
 
 /**
- * The two panel pages: the everyday dashboard, and the weekly comfort rhythm.
+ * The panel layout.
  *
  * Two constraints shape all of them. There are six colours and no greys, so
  * colour carries meaning (comfort verdict, indoor vs. outdoor) and never
@@ -307,100 +307,6 @@ function layoutDashboard(d: EpaperData, ctx: Ctx, forecast: Forecast | null, hou
   else panelDayCourse(d, ctx)
 }
 
-
-// ─── rhythm ──────────────────────────────────────────────────────────────────
-// A week of indoor comfort as 7x24 tiles. This is the one place the full
-// palette earns its keep: hue says *which way* the room drifted, so a cold
-// night and a warm evening are told apart at a glance instead of both reading
-// as "poor".
-
-const RHYTHM_FILL: Record<RhythmTone, string> = {
-  good: '#00FF00',
-  warn: '#FFFF00',
-  cold: '#0000FF',
-  hot:  '#FF0000',
-  none: '#FFFFFF',
-}
-// Mono keeps the same reading order by weight instead of hue.
-const RHYTHM_FILL_MONO: Record<RhythmTone, string> = {
-  good: '#FFFFFF', warn: '#FFFFFF', cold: '#000000', hot: '#000000', none: '#FFFFFF',
-}
-
-const RHYTHM_LEGEND: { tone: RhythmTone; text: string }[] = [
-  { tone: 'cold', text: 'cold' },
-  { tone: 'good', text: 'comfortable' },
-  { tone: 'warn', text: 'drifting' },
-  { tone: 'hot', text: 'warm' },
-]
-
-export function buildRhythmSvg(
-  r: RhythmData,
-  palette: PaletteName = 'spectra6',
-  batteryPct: number | null = null,
-): string {
-  const parts: string[] = []
-  const mono = palette === 'mono'
-  const ctx: Ctx = {
-    mono,
-    accent: mono ? '#000000' : '#0000FF',
-    push: (s: string) => parts.push(s),
-  }
-  const { push } = ctx
-
-  push(`<rect width="${SCREEN_W}" height="${SCREEN_H}" fill="#FFFFFF"/>`)
-  header({ stale: r.stale, updatedAt: r.updatedAt } as EpaperData, batteryPct, ctx)
-
-  const labelW = 62
-  const gridX = PAD + labelW
-  const gridW = SCREEN_W - PAD - gridX
-  const cellW = gridW / 24
-  const top = 92
-  const rowH = 40
-  const gap = 3
-
-  r.days.forEach((day, row) => {
-    const y = top + row * rowH
-    push(`<text x="${PAD + labelW - 14}" y="${y + rowH / 2 + 5}" font-size="15"
-      text-anchor="end" fill="#000000">${esc(day.label)}</text>`)
-    day.cells.forEach((tone, hour) => {
-      const x = gridX + hour * cellW
-      const fill = mono ? RHYTHM_FILL_MONO[tone] : RHYTHM_FILL[tone]
-      // Empty hours get an outline only, so a gap reads as absence rather than
-      // as a comfortable white tile.
-      push(`<rect x="${x.toFixed(1)}" y="${y}" width="${(cellW - gap).toFixed(1)}"
-        height="${rowH - gap}" fill="${fill}"
-        stroke="${tone === 'none' ? '#000000' : 'none'}" stroke-width="${tone === 'none' ? 1 : 0}"/>`)
-    })
-  })
-
-  const axisY = top + r.days.length * rowH + 22
-  for (const h of [0, 6, 12, 18]) {
-    push(label(String(h).padStart(2, '0'), gridX + h * cellW, axisY))
-  }
-  push(label('24', SCREEN_W - PAD, axisY, '#000000', 'end'))
-
-  const legendY = axisY + 34
-  let lx = PAD
-  for (const item of RHYTHM_LEGEND) {
-    push(`<rect x="${lx}" y="${legendY - 13}" width="16" height="16"
-      fill="${mono ? RHYTHM_FILL_MONO[item.tone] : RHYTHM_FILL[item.tone]}"
-      stroke="#000000" stroke-width="2"/>`)
-    push(`<text x="${lx + 24}" y="${legendY}" font-size="15" fill="#000000">${esc(item.text)}</text>`)
-    lx += 24 + item.text.length * 8 + 26
-  }
-  // Same corner as the dashboard, but on the legend's own line: stacking it
-  // would run into the hour axis directly above and into the bottom edge below.
-  if (r.outdoor) {
-    push(`<text x="${SCREEN_W - PAD}" y="${legendY + 2}" font-size="26" font-weight="300"
-      text-anchor="end" fill="#000000">${esc(num(r.outdoor.temp))}°</text>`)
-    push(label(`outdoor · ${r.outdoor.name}`, SCREEN_W - PAD - 76, legendY, ctx.accent, 'end'))
-  } else {
-    push(label('indoor comfort · 7 days', SCREEN_W - PAD, legendY, '#000000', 'end'))
-  }
-
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="${SCREEN_W}" height="${SCREEN_H}"
-    viewBox="0 0 ${SCREEN_W} ${SCREEN_H}" font-family="${FONT}">${parts.join('')}</svg>`
-}
 
 export function buildDashboardSvg(
   d: EpaperData,
