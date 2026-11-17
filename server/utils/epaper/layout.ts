@@ -175,6 +175,42 @@ function forecastTitle(iso: string): string {
   })
 }
 
+const hh = (h: number): string => `${String(h).padStart(2, '0')}:00`
+
+/**
+ * Frost or ice for the forecast day, in the free corner beside the low.
+ *
+ * Only drawn when there is something to say — an empty "no frost" box all
+ * summer would train the eye to skip the corner. Slippery roads outrank a
+ * frosted windscreen and get red; frost alone is blue, the forecast's own
+ * colour. Mono has neither, so ice inverts to black and frost stays outlined.
+ */
+function winterBadge(f: Forecast, ctx: Ctx): void {
+  const { push, mono } = ctx
+  const { frost, slippery } = f.winter
+  if (!frost && !slippery) return
+
+  const x = 262, y = 128, w = SPLIT_X - 30 - x, h = 70
+  let fill: string, ink: string, title: string, line: string
+  if (slippery) {
+    fill = mono ? '#000000' : '#FF0000'
+    ink = '#FFFFFF'
+    title = slippery.kind === 'black ice' ? 'black ice risk' : slippery.kind
+    line = slippery.kind === 'snow' && slippery.snowCm > 0
+      ? `${slippery.snowCm.toFixed(slippery.snowCm < 10 ? 1 : 0)} cm · ${hh(slippery.hour)}`
+      : `from ${hh(slippery.hour)}`
+  } else {
+    fill = mono ? '#FFFFFF' : '#0000FF'
+    ink = mono ? '#000000' : '#FFFFFF'
+    title = 'frost · scrape'
+    line = `from ${hh(frost!.from)}`
+  }
+  push(`<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="10"
+    fill="${fill}" stroke="${RULE}" stroke-width="3"/>`)
+  push(label(title, x + 16, y + 27, ink))
+  push(`<text x="${x + 16}" y="${y + 56}" font-size="22" fill="${ink}">${esc(line)}</text>`)
+}
+
 function panelForecast(f: Forecast | null, ctx: Ctx): void {
   const { push, accent } = ctx
 
@@ -191,6 +227,7 @@ function panelForecast(f: Forecast | null, ctx: Ctx): void {
     fill="#000000">${esc(`${num(f.high, 0)}°`)}</text>`)
   push(`<text x="${PAD + 140}" y="192" font-size="44" font-weight="300"
     fill="#000000">${esc(`${num(f.low, 0)}°`)}</text>`)
+  winterBadge(f, ctx)
 
   const peak = Math.max(...f.hourly.map(h => h.mm), 0)
   const bx = PAD, bw = SPLIT_X - 30 - PAD
