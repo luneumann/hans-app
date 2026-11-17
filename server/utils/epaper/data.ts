@@ -48,7 +48,16 @@ export interface BirdVisits {
   day: string
   yesterday: boolean
   count: number | null
+  /**
+   * Mean visits per day over the week before `day`, rounded; null with fewer
+   * than BIRD_WEEK_MIN_DAYS days on record. Days the Pi sent nothing are left
+   * out rather than counted as zero — an offline camera is not an empty feeder.
+   */
+  weekAvg: number | null
 }
+
+export const BIRD_WEEK_DAYS = 7
+export const BIRD_WEEK_MIN_DAYS = 3
 
 /**
  * Before this Berlin hour the panel shows yesterday's visits: early in the
@@ -68,9 +77,38 @@ function berlinParts(now: Date): { day: string; hour: number } {
 export function birdDay(now: Date): { day: string; yesterday: boolean } {
   const { day, hour } = berlinParts(now)
   if (hour >= BIRD_TODAY_FROM_HOUR) return { day, yesterday: false }
+  return { day: shiftDay(day, -1), yesterday: true }
+}
+
+function shiftDay(day: string, by: number): string {
   const d = new Date(`${day}T12:00:00Z`)
-  d.setUTCDate(d.getUTCDate() - 1)
-  return { day: d.toISOString().slice(0, 10), yesterday: true }
+  d.setUTCDate(d.getUTCDate() + by)
+  return d.toISOString().slice(0, 10)
+}
+
+interface BirdRow { day: string; visits: number }
+
+/**
+ * The shown day's count and the week before it, from rows ordered newest
+ * first. Pure, for testing: the first row seen for a day is its current count.
+ */
+export function shapeBirdVisits(day: string, yesterday: boolean, rows: BirdRow[]): BirdVisits {
+  const latest = new Map<string, number>()
+  for (const r of rows) if (!latest.has(r.day)) latest.set(r.day, r.visits)
+
+  const week: number[] = []
+  for (let i = 1; i <= BIRD_WEEK_DAYS; i++) {
+    const v = latest.get(shiftDay(day, -i))
+    if (v !== undefined) week.push(v)
+  }
+  return {
+    day,
+    yesterday,
+    count: latest.get(day) ?? null,
+    weekAvg: week.length >= BIRD_WEEK_MIN_DAYS
+      ? Math.round(week.reduce((a, b) => a + b, 0) / week.length)
+      : null,
+  }
 }
 
 /**
@@ -78,18 +116,21 @@ export function birdDay(now: Date): { day: string; yesterday: boolean } {
  * changes (today and yesterday, so late deletions land too). The newest row of
  * a day is the current count. The Pi does the counting because grouping clips
  * into visits and discarding false triggers lives there.
+ *
+ * One query covers the shown day and the week before it, for the average.
  */
 async function fetchBirdVisits(supabase: SupabaseClient, now = new Date()): Promise<BirdVisits> {
   const { day, yesterday } = birdDay(now)
   const { data, error } = await supabase
     .from('birdhouse_visits')
-    .select('visits')
-    .eq('day', day)
+    .select('day, visits')
+    .gte('day', shiftDay(day, -BIRD_WEEK_DAYS))
+    .lte('day', day)
     .order('recorded_at', { ascending: false })
     .order('id', { ascending: false })
-    .limit(1)
+    .limit(5000)
   if (error) throw error
-  return { day, yesterday, count: data?.[0]?.visits ?? null }
+  return shapeBirdVisits(day, yesterday, (data ?? []) as BirdRow[])
 }
 
 const WINDOW_HOURS = 24

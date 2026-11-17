@@ -85,7 +85,8 @@ You need Node 20+, a Supabase project, and (optionally) the hardware.
    the anon role, reads restricted to authenticated users.
    Optionally a `birdhouse_visits` table (`day` date, `visits` int, `recorded_at`
    timestamptz default now()), same RLS. The birdhouse camera Pi appends a row whenever a
-   day's count changes; the panel header shows today's count, before 09:00 yesterday's.
+   day's count changes; the panel header shows today's count, before 09:00 yesterday's,
+   followed by the average per day over the week before it.
 
 4. **Run it**
 
