@@ -86,7 +86,7 @@ You need Node 20+, a Supabase project, and (optionally) the hardware.
    Optionally a `birdhouse_visits` table (`day` date, `visits` int, `recorded_at`
    timestamptz default now()), same RLS. The birdhouse camera Pi appends a row whenever a
    day's count changes; the panel header shows today's count, before 09:00 yesterday's,
-   followed by the average per day over the week before it.
+   followed by the total of the last seven days, that one included.
 
 4. **Run it**
 

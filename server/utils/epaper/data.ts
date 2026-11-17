@@ -49,15 +49,14 @@ export interface BirdVisits {
   yesterday: boolean
   count: number | null
   /**
-   * Mean visits per day over the week before `day`, rounded; null with fewer
-   * than BIRD_WEEK_MIN_DAYS days on record. Days the Pi sent nothing are left
-   * out rather than counted as zero — an offline camera is not an empty feeder.
+   * Total visits over the seven days ending with `day`, that day included;
+   * null when none of them has a row. Days the Pi sent nothing for add
+   * nothing, so an offline stretch shows as a smaller week, not a wrong one.
    */
-  weekAvg: number | null
+  weekSum: number | null
 }
 
 export const BIRD_WEEK_DAYS = 7
-export const BIRD_WEEK_MIN_DAYS = 3
 
 /**
  * Before this Berlin hour the panel shows yesterday's visits: early in the
@@ -89,26 +88,19 @@ function shiftDay(day: string, by: number): string {
 interface BirdRow { day: string; visits: number }
 
 /**
- * The shown day's count and the week before it, from rows ordered newest
- * first. Pure, for testing: the first row seen for a day is its current count.
+ * The shown day's count and the week's total, from rows ordered newest first.
+ * Pure, for testing: the first row seen for a day is its current count.
  */
 export function shapeBirdVisits(day: string, yesterday: boolean, rows: BirdRow[]): BirdVisits {
   const latest = new Map<string, number>()
   for (const r of rows) if (!latest.has(r.day)) latest.set(r.day, r.visits)
 
-  const week: number[] = []
-  for (let i = 1; i <= BIRD_WEEK_DAYS; i++) {
+  let weekSum: number | null = null
+  for (let i = 0; i < BIRD_WEEK_DAYS; i++) {
     const v = latest.get(shiftDay(day, -i))
-    if (v !== undefined) week.push(v)
+    if (v !== undefined) weekSum = (weekSum ?? 0) + v
   }
-  return {
-    day,
-    yesterday,
-    count: latest.get(day) ?? null,
-    weekAvg: week.length >= BIRD_WEEK_MIN_DAYS
-      ? Math.round(week.reduce((a, b) => a + b, 0) / week.length)
-      : null,
-  }
+  return { day, yesterday, count: latest.get(day) ?? null, weekSum }
 }
 
 /**
@@ -117,14 +109,14 @@ export function shapeBirdVisits(day: string, yesterday: boolean, rows: BirdRow[]
  * a day is the current count. The Pi does the counting because grouping clips
  * into visits and discarding false triggers lives there.
  *
- * One query covers the shown day and the week before it, for the average.
+ * One query covers the shown day and the six before it, for the week's total.
  */
 async function fetchBirdVisits(supabase: SupabaseClient, now = new Date()): Promise<BirdVisits> {
   const { day, yesterday } = birdDay(now)
   const { data, error } = await supabase
     .from('birdhouse_visits')
     .select('day, visits')
-    .gte('day', shiftDay(day, -BIRD_WEEK_DAYS))
+    .gte('day', shiftDay(day, -(BIRD_WEEK_DAYS - 1)))
     .lte('day', day)
     .order('recorded_at', { ascending: false })
     .order('id', { ascending: false })

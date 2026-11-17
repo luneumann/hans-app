@@ -105,10 +105,10 @@ function header(d: EpaperData, batteryPct: number | null, ctx: Ctx): void {
   if (batteryPct !== null) ctx.push(battery(batteryPct, SCREEN_W - PAD - 72, 46, ctx.mono))
   // Birdhouse visits in the free stretch after the wordmark. Before 09:00 it is
   // yesterday's count (see BIRD_TODAY_FROM_HOUR), and the label says so. The
-  // week's average trails it, so a single day reads as busy or quiet.
+  // total of the last seven days, that one included, trails it.
   if (d.birdVisits) {
     const b = d.birdVisits
-    const week = b.weekAvg === null ? '' : ` · week Ø ${b.weekAvg}`
+    const week = b.weekSum === null ? '' : ` · week ${b.weekSum}`
     ctx.push(`<text x="${PAD + 132}" y="46" font-size="17" fill="#000000">${esc(
       `birds ${b.yesterday ? 'yesterday' : 'today'} · ${b.count ?? '--'}${week}`,
     )}</text>`)
