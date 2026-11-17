@@ -39,6 +39,57 @@ export interface EpaperData {
   updatedAt: Date | null
   /** No reading in the last hour — the panel should say so rather than lie. */
   stale: boolean
+  /** Birdhouse visits as counted by the camera Pi; null when unavailable. */
+  birdVisits?: BirdVisits | null
+}
+
+export interface BirdVisits {
+  /** Berlin calendar day the count belongs to, YYYY-MM-DD. */
+  day: string
+  yesterday: boolean
+  count: number | null
+}
+
+/**
+ * Before this Berlin hour the panel shows yesterday's visits: early in the
+ * morning today's count is still close to zero and says nothing.
+ */
+export const BIRD_TODAY_FROM_HOUR = 9
+
+function berlinParts(now: Date): { day: string; hour: number } {
+  const p = Object.fromEntries(new Intl.DateTimeFormat('en-GB', {
+    timeZone: 'Europe/Berlin', year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', hourCycle: 'h23',
+  }).formatToParts(now).map(x => [x.type, x.value]))
+  return { day: `${p.year}-${p.month}-${p.day}`, hour: Number(p.hour) }
+}
+
+/** Which Berlin day the panel should count, given the time. Pure, for testing. */
+export function birdDay(now: Date): { day: string; yesterday: boolean } {
+  const { day, hour } = berlinParts(now)
+  if (hour >= BIRD_TODAY_FROM_HOUR) return { day, yesterday: false }
+  const d = new Date(`${day}T12:00:00Z`)
+  d.setUTCDate(d.getUTCDate() - 1)
+  return { day: d.toISOString().slice(0, 10), yesterday: true }
+}
+
+/**
+ * The birdhouse Pi appends a row to `birdhouse_visits` whenever a day's count
+ * changes (today and yesterday, so late deletions land too). The newest row of
+ * a day is the current count. The Pi does the counting because grouping clips
+ * into visits and discarding false triggers lives there.
+ */
+async function fetchBirdVisits(supabase: SupabaseClient, now = new Date()): Promise<BirdVisits> {
+  const { day, yesterday } = birdDay(now)
+  const { data, error } = await supabase
+    .from('birdhouse_visits')
+    .select('visits')
+    .eq('day', day)
+    .order('recorded_at', { ascending: false })
+    .order('id', { ascending: false })
+    .limit(1)
+  if (error) throw error
+  return { day, yesterday, count: data?.[0]?.visits ?? null }
 }
 
 const WINDOW_HOURS = 24
@@ -132,7 +183,15 @@ export async function fetchEpaperData(): Promise<EpaperData> {
   const supabase = createClient(url, key, { auth: { persistSession: false } })
   const since = new Date(Date.now() - WINDOW_HOURS * 60 * 60 * 1000).toISOString()
 
-  return deriveEpaperData(await fetchReadings(supabase, since, 27000))
+  const [rows, birdVisits] = await Promise.all([
+    fetchReadings(supabase, since, 27000),
+    // The birdhouse is a side note; its outage must not take the panel down.
+    fetchBirdVisits(supabase).catch((err): null => {
+      console.warn('[epaper] bird visits unavailable:', err instanceof Error ? err.message : err)
+      return null
+    }),
+  ])
+  return { ...deriveEpaperData(rows), birdVisits }
 }
 
 /** Pure shaping step, split out so it can be exercised without a database. */

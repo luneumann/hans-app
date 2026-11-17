@@ -83,6 +83,9 @@ You need Node 20+, a Supabase project, and (optionally) the hardware.
 3. **Create the schema** — a `devices` table and a `sensor_readings` table
    (`sparrow_id`, `metric`, `value`, `recorded_at`), with RLS enabled: insert-only for
    the anon role, reads restricted to authenticated users.
+   Optionally a `birdhouse_visits` table (`day` date, `visits` int, `recorded_at`
+   timestamptz default now()), same RLS. The birdhouse camera Pi appends a row whenever a
+   day's count changes; the panel header shows today's count, before 09:00 yesterday's.
 
 4. **Run it**
 

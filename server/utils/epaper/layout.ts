@@ -103,6 +103,14 @@ function header(d: EpaperData, batteryPct: number | null, ctx: Ctx): void {
       d.stale ? `stale · ${formatStamp(d.updatedAt)}` : formatStamp(d.updatedAt),
     )}</text>`)
   if (batteryPct !== null) ctx.push(battery(batteryPct, SCREEN_W - PAD - 72, 46, ctx.mono))
+  // Birdhouse visits in the free stretch after the wordmark. Before 09:00 it is
+  // yesterday's count (see BIRD_TODAY_FROM_HOUR), and the label says so.
+  if (d.birdVisits) {
+    const b = d.birdVisits
+    ctx.push(`<text x="${PAD + 132}" y="46" font-size="17" fill="#000000">${esc(
+      `birds ${b.yesterday ? 'yesterday' : 'today'} · ${b.count ?? '--'}`,
+    )}</text>`)
+  }
   ctx.push(`<rect x="${PAD}" y="64" width="${SCREEN_W - PAD * 2}" height="3" fill="${RULE}"/>`)
 }
 
